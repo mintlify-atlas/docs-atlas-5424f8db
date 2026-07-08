@@ -35,13 +35,7 @@ The middleware logic runs in the following order each time a navigation is trigg
 
 ## Enabling the Middleware
 
-By default the middleware is **not** applied globally. You can protect individual pages by adding `auth: true` to their `definePageMeta` call:
-
-```vue
-<script setup lang="ts">
-definePageMeta({ auth: true })
-</script>
-```
+By default the middleware is **not** applied globally. When `globalMiddleware` is disabled, only pages that are explicitly matched by a per-route middleware declaration are checked. The simplest way to protect all pages at once is to enable the global middleware. When using `globalMiddleware: true`, every route is protected unless it opts out. You do not need to add any page meta to protect a page — omitting `auth` entirely is sufficient.
 
 To apply the middleware automatically to every route in your application, set `globalMiddleware: true` in `nuxt.config.ts`:
 
@@ -57,13 +51,12 @@ When `globalMiddleware` is enabled you can still opt individual pages out by set
 
 ## Page Meta Options
 
-The `auth` route meta property accepts three values that control how the middleware behaves for that specific page. The `RouteMeta` interface is augmented by the module so TypeScript will validate these values automatically.
+The `auth` route meta property controls how the middleware behaves for a specific page. The module augments `vue-router`'s `RouteMeta` interface with the type `auth?: 'guest' | false`, so TypeScript will validate these values automatically.
+
+There are only two valid explicit values:
 
 ```vue
 <script setup lang="ts">
-// Require authentication — redirects unauthenticated users to /login
-definePageMeta({ auth: true })
-
 // Guest-only — authenticated users are redirected to the home path
 definePageMeta({ auth: 'guest' })
 
@@ -72,8 +65,10 @@ definePageMeta({ auth: false })
 </script>
 ```
 
+Pages that do **not** set `auth` at all are treated as protected when `globalMiddleware` is `true`. There is no `auth: true` value — leaving the property unset is the way to require authentication.
+
 <Note>
-  Setting `auth: false` is the correct way to mark a page as fully public. The middleware will return early before making any auth checks.
+  `auth: true` is **not** a valid TypeScript value. The `RouteMeta` augmentation declares `auth?: 'guest' | false`. To protect a page, simply do not set `auth` (or enable `globalMiddleware`). To make a page fully public, set `auth: false`.
 </Note>
 
 ## Disabling the Middleware Entirely

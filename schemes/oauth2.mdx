@@ -118,8 +118,8 @@ export default defineNuxtConfig({
   Your OAuth2 application's client ID, issued by the provider when you register the application.
 </ParamField>
 
-<ParamField body="clientSecretTransport" type="'body' | 'authorization_header'">
-  Controls how the client secret is sent during the token exchange. `'body'` includes it as a form field; `'authorization_header'` uses HTTP Basic authentication.
+<ParamField body="clientSecretTransport" type="'body' | 'aurthorization_header'">
+  Controls how the client secret is sent during the token exchange. `'body'` includes it as a form field; `'aurthorization_header'` uses HTTP Basic authentication.
 
   **Default:** `'body'`
 </ParamField>
@@ -194,6 +194,74 @@ strategies: {
 
 ---
 
+## Token
+
+<ParamField body="token.property" type="string">
+  The dot-notation path in the token exchange (or refresh) response where the access token lives.
+
+  **Default:** `'access_token'`
+</ParamField>
+
+<ParamField body="token.expiresProperty" type="string">
+  The dot-notation path in the token response for the access token's lifetime in seconds. Used when `token.maxAge` is `false`.
+
+  **Default:** `'expires_in'`
+</ParamField>
+
+<ParamField body="token.type" type="string | false">
+  The prefix prepended to the token value when setting the authorization header (e.g. `'Bearer mytoken123'`). Set to `false` to send the raw token without a prefix.
+
+  **Default:** `'Bearer'`
+</ParamField>
+
+<ParamField body="token.name" type="string">
+  The HTTP request header used to carry the token.
+
+  **Default:** `'Authorization'`
+</ParamField>
+
+<ParamField body="token.maxAge" type="number | false">
+  Override the token lifetime in seconds, ignoring any value returned by the server. When `false`, the scheme reads `token.expiresProperty` from the token response instead.
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="token.global" type="boolean">
+  When `true`, the token is automatically attached to every outgoing HTTP request via the request interceptor.
+
+  **Default:** `true`
+</ParamField>
+
+<ParamField body="token.prefix" type="string">
+  The key prefix used when persisting the token in storage.
+
+  **Default:** `'_token.'`
+</ParamField>
+
+<ParamField body="token.expirationPrefix" type="string">
+  The key prefix used when persisting the token expiration timestamp in storage.
+
+  **Default:** `'_token_expiration.'`
+</ParamField>
+
+<ParamField body="token.httpOnly" type="boolean">
+  When `true`, the access token is expected to be managed by a server-side `httpOnly` cookie rather than stored in JavaScript-accessible storage.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
+## User
+
+<ParamField body="user.property" type="string | false">
+  The dot-notation path within the userInfo endpoint response that contains the user object. Set to `false` if the entire response body is the user object.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
 ## Refresh Token
 
 <ParamField body="refreshToken.property" type="string | false">
@@ -206,6 +274,18 @@ strategies: {
   The refresh token's lifetime in seconds. Used to determine when the refresh token itself has expired and a new authorization flow is required.
 
   **Default:** `2592000` (30 days)
+</ParamField>
+
+<ParamField body="refreshToken.prefix" type="string">
+  The key prefix used when persisting the refresh token in storage.
+
+  **Default:** `'_refresh_token.'`
+</ParamField>
+
+<ParamField body="refreshToken.expirationPrefix" type="string">
+  The key prefix used when persisting the refresh token expiration timestamp in storage.
+
+  **Default:** `'_refresh_token_expiration.'`
 </ParamField>
 
 <ParamField body="refreshToken.httpOnly" type="boolean">

@@ -80,13 +80,10 @@ The `redirectStrategy` option determines how the user's original URL is preserve
 
 ## Per-page Auth Meta
 
-The middleware reads `definePageMeta({ auth })` on each route to decide whether and how to enforce authentication. You have three options per page:
+The middleware reads `definePageMeta({ auth })` on each route to decide whether and how to enforce authentication. The `auth` route meta field accepts `'guest'` or `false`:
 
 ```vue
 <script setup lang="ts">
-// Require authentication — unauthenticated users are redirected to redirect.login
-definePageMeta({ auth: true })
-
 // Guest-only page — logged-in users are redirected to redirect.home
 definePageMeta({ auth: 'guest' })
 
@@ -96,7 +93,7 @@ definePageMeta({ auth: false })
 ```
 
 <Note>
-  When `globalMiddleware` is `false` (the default), pages without a `definePageMeta({ auth })` declaration are **not** protected. When `globalMiddleware` is `true`, all pages are protected unless you explicitly opt out with `auth: false`.
+  The `auth` route meta type is `'guest' | false`. There is no `auth: true` — authentication enforcement is controlled by `globalMiddleware` and `enableMiddleware` at the module level, not per-page. When `globalMiddleware` is `true`, all pages are protected and you can opt individual pages out with `auth: false`. When `globalMiddleware` is `false` (the default), only pages that explicitly include the auth middleware are protected. Use `auth: 'guest'` to restrict a page to unauthenticated users only, or `auth: false` to disable auth checks on a page entirely.
 </Note>
 
 ---

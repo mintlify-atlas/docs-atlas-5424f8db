@@ -12,7 +12,7 @@ Understanding the full rendering cycle helps when debugging SSR auth issues:
 
 <Steps>
   <Step title="Token extraction">
-    On the server, the `Storage` class reads tokens from the incoming HTTP request's cookie header. No `localStorage` or `sessionStorage` is accessed because those APIs do not exist in a Node.js environment.
+    On the server, the `Storage` class calls `getUniversal()` which checks local state first (prepended to the source order when `process.server` is true), then falls through to the cookie header parsed from the incoming HTTP request. No `localStorage` or `sessionStorage` is accessed because those APIs do not exist in a Node.js environment. In practice, since state starts empty at the beginning of each request, cookies are the effective token source on the server.
   </Step>
   <Step title="Auth initialization">
     The `Auth` instance is constructed with the extracted tokens and the configured module options. `auth.$state.loggedIn` and `auth.user` are populated from the stored values.
@@ -62,7 +62,7 @@ export default defineNuxtConfig({
 
 ## The Nitro Reset Endpoint
 
-When `ssr: true` is set in your `nuxt.config.ts`, `@nuxt-alt/auth` automatically registers a Nitro server handler at `POST /_auth/reset`. This endpoint clears the auth cookie from the server side, ensuring that a logout operation correctly removes the session cookie even when the HTTP-only flag prevents client-side JavaScript from doing so.
+When Nuxt SSR mode is active (i.e. `ssr` is not disabled in `nuxt.config.ts`), `@nuxt-alt/auth` automatically registers a Nitro server handler at `POST /_auth/reset`. This endpoint clears the auth cookie from the server side, ensuring that a logout operation correctly removes the session cookie even when the HTTP-only flag prevents client-side JavaScript from doing so.
 
 The handler is registered during module setup:
 

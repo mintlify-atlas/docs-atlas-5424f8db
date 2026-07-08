@@ -51,9 +51,9 @@ The module augments `vue-router`'s `RouteMeta` interface to add the `auth` prope
 
 ```ts
 // TypeScript knows the valid values for auth: 'guest' | false
-definePageMeta({ auth: 'guest' }) // ✅ valid
-definePageMeta({ auth: false })   // ✅ valid
-definePageMeta({ auth: true })    // ✅ valid (opts into middleware)
+definePageMeta({ auth: 'guest' }) // ✅ valid — guest-only page
+definePageMeta({ auth: false })   // ✅ valid — public page, middleware skipped
+definePageMeta({ auth: true })    // ❌ type error — not a valid value
 definePageMeta({ auth: 'admin' }) // ❌ type error
 ```
 
@@ -66,6 +66,10 @@ declare module 'vue-router' {
   }
 }
 ```
+
+<Note>
+  `auth: true` is **not** a valid value. To require authentication on a page, simply leave the `auth` property unset. When `globalMiddleware` is `true`, all pages without an explicit `auth` value are treated as protected. To opt a page out of auth entirely, set `auth: false`.
+</Note>
 
 ## ModuleOptions Type
 

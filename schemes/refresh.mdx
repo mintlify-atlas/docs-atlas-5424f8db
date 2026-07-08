@@ -15,7 +15,7 @@ export default defineNuxtConfig({
       local: {
         scheme: 'refresh',
         token: {
-          property: 'access_token',
+          property: 'token',   // default; override to match your API response field
           maxAge: 1800,
         },
         refreshToken: {

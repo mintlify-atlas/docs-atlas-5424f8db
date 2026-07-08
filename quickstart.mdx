@@ -97,33 +97,39 @@ const auth = useAuth()
 
 `@nuxt-alt/auth` registers a built-in route middleware named `auth`. You activate it per-page with `definePageMeta` — no manual middleware imports needed.
 
-**Require authentication** — unauthenticated visitors are redirected to `auth.redirect.login`:
+**Require authentication per page** — apply the named `auth` middleware on any page where unauthenticated visitors should be redirected to `auth.redirect.login`:
 
 ```vue pages/dashboard.vue
 <script setup lang="ts">
-definePageMeta({ auth: true })
+definePageMeta({ middleware: 'auth' })
 </script>
 ```
 
-**Guest-only page** — authenticated users are redirected away (useful for login and register pages):
+**Guest-only page** — once the middleware is active on a route, mark it as guest-only so that already-authenticated users are redirected away (useful for login and register pages):
 
 ```vue pages/login.vue
 <script setup lang="ts">
 // Redirect logged-in users away from this page
-definePageMeta({ auth: 'guest' })
+definePageMeta({ middleware: 'auth', auth: 'guest' })
 </script>
 ```
 
-**Opt out entirely** — the page is publicly accessible regardless of auth state:
+**Opt out entirely** — when `globalMiddleware` is `true`, every route runs the middleware by default. Mark individual pages as public with `auth: false`:
 
 ```vue pages/about.vue
 <script setup lang="ts">
-// This page is publicly accessible
+// This page is publicly accessible (used when globalMiddleware: true)
 definePageMeta({ auth: false })
 </script>
 ```
 
-To apply the middleware globally to every route by default, set `globalMiddleware: true` in your module options, then use `auth: false` on pages you want to keep public.
+To protect every route by default, set `globalMiddleware: true` in your module options. The middleware will then run on all pages, and you only need `auth: false` on pages you want to keep public.
+
+<Note>
+  The `RouteMeta.auth` type accepts only `'guest'` or `false`. The value `true`
+  is not valid — to require authentication on a specific page, add the
+  middleware explicitly with `middleware: 'auth'`.
+</Note>
 
 </Step>
 

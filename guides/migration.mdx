@@ -131,7 +131,7 @@ The following parts of the API are compatible with `@nuxtjs/auth` and require no
     The composable name and its return value are identical.
   </Card>
   <Card title="Page meta" icon="file">
-    `definePageMeta({ auth: ... })` works the same way.
+    `definePageMeta({ auth: 'guest' })` and `definePageMeta({ auth: false })` work the same way. Note that `auth: true` is no longer a valid value — pages are protected by default when `globalMiddleware` is enabled.
   </Card>
   <Card title="Redirect keys" icon="arrow-right">
     `redirect.login`, `redirect.logout`, `redirect.callback`, `redirect.home`.

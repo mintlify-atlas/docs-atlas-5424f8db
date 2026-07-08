@@ -1,7 +1,7 @@
 ---
 title: "Laravel JWT Provider for @nuxt-alt/auth"
 sidebarTitle: "Laravel JWT"
-description: "Configure @nuxt-alt/auth with Laravel JWT for token-based authentication using the local scheme with JWT access tokens and refresh token support."
+description: "Configure @nuxt-alt/auth with Laravel JWT for token-based authentication using the laravelJWT scheme with JWT access tokens and refresh token support."
 ---
 
 The Laravel JWT provider configures `@nuxt-alt/auth` to authenticate users against a Laravel backend using [tymon/jwt-auth](https://github.com/tymondesigns/jwt-auth) or a compatible JWT library. It uses the dedicated `laravelJWT` scheme, which extends the refresh scheme with JWT-specific defaults — including a short-lived access token, a long-lived refresh window, and server-side token refresh via the Authorization header (rather than a refresh token payload). All endpoint URLs are derived from the `url` you supply.

@@ -74,6 +74,14 @@ Re-fetches the current user from the strategy's user endpoint and updates `auth.
 await auth.fetchUser()
 ```
 
+### fetchUserOnce()
+
+Fetches the current user only if `auth.user` is not already set. This is used internally during strategy initialization to avoid redundant network requests. You can call it directly if you want a lazy fetch that respects any previously loaded user data.
+
+```ts
+await auth.fetchUserOnce()
+```
+
 ### setUser()
 
 Manually sets or clears the user object in the auth state. When `false` is passed, the user is cleared and `loggedIn` is set to `false`.
@@ -143,6 +151,14 @@ Resets the current strategy, stores the new strategy name, and calls `mounted()`
 
 ```ts
 await auth.setStrategy('github')
+```
+
+### registerStrategy()
+
+Registers a custom strategy instance under a given name, making it available for `setStrategy()` and `loginWith()`. This is used internally during module initialization but can be called from a plugin to add runtime strategies.
+
+```ts
+auth.registerStrategy('myCustomStrategy', myStrategyInstance)
 ```
 
 ### hasScope()

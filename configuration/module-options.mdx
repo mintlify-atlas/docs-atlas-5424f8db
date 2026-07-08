@@ -167,6 +167,14 @@ The `redirect` object and related options govern where users are sent at various
 
 ---
 
+## Internal Options
+
+<ParamField body="initialState" type="AuthState">
+  Seed value for the reactive auth state object. This option is set internally by the module before the `Storage` class is initialized and should not be set manually in `nuxt.config.ts`.
+</ParamField>
+
+---
+
 ## Full Configuration Example
 
 The following `nuxt.config.ts` shows all commonly used options together:
