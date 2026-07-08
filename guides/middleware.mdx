@@ -1,0 +1,130 @@
+---
+title: "Authentication Middleware in @nuxt-alt/auth"
+sidebarTitle: "Middleware"
+description: "Learn how @nuxt-alt/auth's built-in route middleware protects pages, handles token refresh, and supports per-page guest and public route configuration."
+---
+
+`@nuxt-alt/auth` includes a built-in route middleware named `auth` that automatically enforces authentication on every page navigation. The middleware is registered via `addRouteMiddleware` during module setup and can be applied globally or per-page. It evaluates the current user state, inspects token expiry, and either proceeds, redirects the user to the login page, or attempts a silent token refresh — all before the target page mounts.
+
+## How It Works
+
+The middleware logic runs in the following order each time a navigation is triggered:
+
+<Steps>
+  <Step title="Check for auth opt-out">
+    If the target route's meta contains `auth: false`, the middleware returns immediately without performing any checks. This is how you mark fully public pages.
+  </Step>
+  <Step title="Check for matched components">
+    If no components are matched for the route (e.g. a 404 or error page), the middleware skips to avoid interfering with Nuxt's own error handling.
+  </Step>
+  <Step title="Authenticated user path">
+    When `auth.$state.loggedIn` is `true`, the middleware runs a token check via `auth.check(true)`:
+
+    - If the user is already on the login page or on a **guest-only** route (`auth: 'guest'`), they are redirected to the configured home path.
+    - If the **refresh token has expired**, `auth.reset()` is called and the user is redirected to login.
+    - If the **access token has expired** and the strategy is refreshable, `auth.refreshTokens()` is called automatically. If the refresh fails, `auth.reset()` is called and the user is redirected to login.
+    - If the **access token has expired** but the strategy is not refreshable, `auth.reset()` is called and the user is redirected to login.
+  </Step>
+  <Step title="Unauthenticated user path">
+    When `auth.$state.loggedIn` is `false`:
+
+    - If the target page is **not** a guest-only page and is **not** the configured callback URL, the user is redirected to the login page.
+    - Guest pages and the callback page are always accessible without authentication.
+  </Step>
+</Steps>
+
+## Enabling the Middleware
+
+By default the middleware is **not** applied globally. You can protect individual pages by adding `auth: true` to their `definePageMeta` call:
+
+```vue
+<script setup lang="ts">
+definePageMeta({ auth: true })
+</script>
+```
+
+To apply the middleware automatically to every route in your application, set `globalMiddleware: true` in `nuxt.config.ts`:
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    globalMiddleware: true,
+  },
+})
+```
+
+When `globalMiddleware` is enabled you can still opt individual pages out by setting `auth: false` in their page meta.
+
+## Page Meta Options
+
+The `auth` route meta property accepts three values that control how the middleware behaves for that specific page. The `RouteMeta` interface is augmented by the module so TypeScript will validate these values automatically.
+
+```vue
+<script setup lang="ts">
+// Require authentication — redirects unauthenticated users to /login
+definePageMeta({ auth: true })
+
+// Guest-only — authenticated users are redirected to the home path
+definePageMeta({ auth: 'guest' })
+
+// Public — the middleware is skipped entirely for this page
+definePageMeta({ auth: false })
+</script>
+```
+
+<Note>
+  Setting `auth: false` is the correct way to mark a page as fully public. The middleware will return early before making any auth checks.
+</Note>
+
+## Disabling the Middleware Entirely
+
+If you want to manage route protection yourself and skip the module's middleware registration altogether, set `enableMiddleware: false`:
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    enableMiddleware: false,
+  },
+})
+```
+
+When this option is `false`, the `auth` middleware is never registered with Nuxt, and `globalMiddleware` has no effect.
+
+## Token Refresh in the Middleware
+
+When the middleware detects that the access token has expired (but the user is otherwise logged in), it checks whether the active strategy supports token refresh via `auth.check(true).isRefreshable`. If a refresh token is available, the middleware calls `auth.refreshTokens()` and awaits the result before allowing navigation to continue. This means the user never sees a redirect to the login page for a simple expired access token — the refresh happens silently in the background.
+
+If `auth.refreshTokens()` throws an error, the middleware catches it, calls `auth.reset()` to clear all stored tokens and user state, and then redirects to the login page. The same outcome applies if the refresh token itself is expired (`refreshTokenExpired === true`) — in that case no refresh is attempted and the reset-and-redirect path is taken directly.
+
+```ts
+// This is what the middleware does internally when the token is expired:
+try {
+  await auth.refreshTokens()
+} catch (error) {
+  auth.reset()
+  return auth.redirect('login', to)
+}
+```
+
+<Note>
+  If you are using an OAuth2 strategy, the callback route (typically the same path as your `redirect.login` config, e.g. `/login`) must be marked with `auth: false` to prevent a redirect loop. When the OAuth provider returns the user to the callback URL, the middleware would otherwise redirect them away before the tokens can be exchanged.
+</Note>
+
+## Redirect Configuration
+
+The paths used for login, home, logout, and callback redirects are all configurable under the `redirect` key in your module options:
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    redirect: {
+      login: '/login',
+      logout: '/',
+      callback: '/login',
+      home: '/',
+    },
+  },
+})
+```
+
+The middleware reads `auth.options.redirect.login` and `auth.options.redirect.callback` directly when deciding where to send the user, so these values must be accurate for correct middleware behavior.

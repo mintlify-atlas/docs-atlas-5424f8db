@@ -1,0 +1,158 @@
+---
+title: "Server-Side Rendering with @nuxt-alt/auth"
+sidebarTitle: "SSR"
+description: "Configure @nuxt-alt/auth for SSR in Nuxt 3, including cookie-based token sync, the Nitro reset endpoint, proxy setup for same-origin requests, and per-scheme SSR options."
+---
+
+`@nuxt-alt/auth` is designed to work correctly with Nuxt 3's SSR mode out of the box. When a request arrives at the server, the module reads auth tokens from the incoming cookie header, initializes the `Auth` instance with those tokens, and runs the active strategy's `mounted()` hook — which fetches the user if a valid token is present. The result is a fully hydrated page with user data on the very first response, with no client-side flash of unauthenticated content.
+
+## How SSR Works
+
+Understanding the full rendering cycle helps when debugging SSR auth issues:
+
+<Steps>
+  <Step title="Token extraction">
+    On the server, the `Storage` class reads tokens from the incoming HTTP request's cookie header. No `localStorage` or `sessionStorage` is accessed because those APIs do not exist in a Node.js environment.
+  </Step>
+  <Step title="Auth initialization">
+    The `Auth` instance is constructed with the extracted tokens and the configured module options. `auth.$state.loggedIn` and `auth.user` are populated from the stored values.
+  </Step>
+  <Step title="Strategy mounted hook">
+    `auth.mounted()` is called, which delegates to the active strategy's `mounted()` method. For the `local` and `refresh` strategies this typically calls `fetchUser()` if a valid token is present, populating `auth.user` with fresh data from your API.
+  </Step>
+  <Step title="Page render">
+    The page renders on the server with full access to `auth.loggedIn`, `auth.user`, and all other reactive state. Middleware runs in this context too, so protected pages redirect on the server before any HTML is sent.
+  </Step>
+  <Step title="Client hydration">
+    The client picks up the auth state from cookies (the same source the server used) and hydrates without a mismatch. No additional network requests are needed for the initial user state.
+  </Step>
+</Steps>
+
+## Token Storage for SSR
+
+Cookies are the only storage mechanism that works on both the server and the client. The module enables cookie storage by default and disables `localStorage` and `sessionStorage` for exactly this reason.
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    stores: {
+      cookie: {
+        enabled: true,   // default — readable on both server and client
+        prefix: 'auth.',
+        options: {
+          sameSite: 'lax',
+          secure: true,  // automatically set in production by the module
+          path: '/',
+        },
+      },
+      local: {
+        enabled: false,  // browser-only — not available during SSR
+      },
+      session: {
+        enabled: false,  // browser-only — not available during SSR
+      },
+    },
+  },
+})
+```
+
+<Warning>
+  `localStorage` and `sessionStorage` are browser-only APIs. If you enable either `stores.local` or `stores.session`, those stores will be silently unavailable during server-side rendering and any tokens written there will not be visible to the server. Always use cookie storage (`stores.cookie`) for SSR deployments.
+</Warning>
+
+## The Nitro Reset Endpoint
+
+When `ssr: true` is set in your `nuxt.config.ts`, `@nuxt-alt/auth` automatically registers a Nitro server handler at `POST /_auth/reset`. This endpoint clears the auth cookie from the server side, ensuring that a logout operation correctly removes the session cookie even when the HTTP-only flag prevents client-side JavaScript from doing so.
+
+The handler is registered during module setup:
+
+```ts
+// Registered automatically when nuxt.options.ssr === true
+// POST /_auth/reset
+```
+
+You do not need to call this endpoint manually — the module's `logout()` flow invokes it as part of the cleanup process when running under SSR.
+
+## Using @nuxt-alt/proxy for SSR
+
+A common SSR challenge occurs when your Nuxt application and your API server are on different origins. Cookies set by the API server will not be sent with requests from the Nuxt server because they are on a different hostname. The recommended solution is to use `@nuxt-alt/proxy` to proxy API requests through the Nuxt server, making all requests same-origin.
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  modules: [
+    '@nuxt-alt/auth',
+    '@nuxt-alt/proxy',
+  ],
+  proxy: {
+    proxies: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+    },
+  },
+  auth: {
+    strategies: {
+      local: {
+        endpoints: {
+          login: { url: '/api/auth/login', method: 'post' },
+          logout: { url: '/api/auth/logout', method: 'post' },
+          user: { url: '/api/auth/user', method: 'get' },
+        },
+      },
+    },
+  },
+})
+```
+
+With this setup, the Nuxt server proxies `/api/*` requests to your backend, so session cookies and auth headers flow through a single origin on both the server and the client.
+
+<Tip>
+  `@nuxt-alt/proxy` is the recommended companion module for any SSR deployment where the Nuxt frontend and the API backend are hosted on different origins. It eliminates a whole class of CORS and cookie-domain issues in one configuration step.
+</Tip>
+
+## Per-Scheme SSR Option
+
+Every scheme accepts an `ssr: true` option that forces the scheme's `baseURL` to an empty string for all requests. When `baseURL` is `''`, `@nuxt-alt/auth` uses `requrl()` to reconstruct the absolute URL from the incoming SSR request, making the API call relative to the Nuxt server host. This is useful when you want SSR requests to go through the local Nuxt/proxy layer without hardcoding an internal URL.
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      local: {
+        ssr: true, // forces baseURL = '' — requests resolve via the Nuxt server
+        endpoints: {
+          login:  { url: '/api/auth/login',  method: 'post' },
+          logout: { url: '/api/auth/logout', method: 'post' },
+          user:   { url: '/api/auth/user',   method: 'get'  },
+        },
+      },
+    },
+  },
+})
+```
+
+## Laravel Sanctum SSR
+
+The `laravelSanctum` provider includes special SSR handling. When `ssr: true` is set on the strategy, the provider enables `addLocalAuthorize`, which attaches the auth token to server-side requests that would otherwise be blocked by same-site cookie restrictions.
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelSanctum: {
+        url: 'http://localhost:8000',
+        ssr: true, // enables addLocalAuthorize for server-side requests
+        endpoints: {
+          csrf:    { url: '/sanctum/csrf-cookie',  method: 'get'  },
+          login:   { url: '/login',                method: 'post' },
+          logout:  { url: '/logout',               method: 'post' },
+          user:    { url: '/api/user',             method: 'get'  },
+        },
+      },
+    },
+  },
+})
+```
+
+When this option is active, the module injects the current access token as a request header on the server, bypassing the same-site cookie restriction that would otherwise prevent the Nuxt SSR server from authenticating on behalf of the client.

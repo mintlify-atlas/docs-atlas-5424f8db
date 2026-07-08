@@ -1,0 +1,148 @@
+---
+title: "Refresh Scheme: Token Refresh for Nuxt 3 Auth"
+sidebarTitle: "Refresh"
+description: "Use the refresh scheme in @nuxt-alt/auth to automatically renew access tokens using a refresh token, with configurable expiry, rotation, and auto-logout behavior."
+---
+
+The `refresh` scheme extends `LocalScheme` with a dedicated refresh token and automatic token renewal. When the access token expires, the scheme calls a refresh endpoint to obtain a new access token — and optionally a rotated refresh token — without requiring the user to log in again. It is the recommended choice for any backend that implements the OAuth2 refresh token flow or issues short-lived JWTs alongside long-lived refresh tokens.
+
+## Configuration
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      local: {
+        scheme: 'refresh',
+        token: {
+          property: 'access_token',
+          maxAge: 1800,
+        },
+        refreshToken: {
+          property: 'refresh_token',
+          data: 'refresh_token',
+          maxAge: 60 * 60 * 24 * 30,
+          required: true,
+          tokenRequired: false,
+          prefix: '_refresh_token.',
+          expirationPrefix: '_refresh_token_expiration.',
+          httpOnly: false,
+        },
+        endpoints: {
+          login:   { url: '/api/auth/login',   method: 'post' },
+          refresh: { url: '/api/auth/refresh', method: 'POST' },
+          logout:  { url: '/api/auth/logout',  method: 'post' },
+          user:    { url: '/api/auth/user',     method: 'get'  },
+        },
+        autoLogout: false,
+      },
+    },
+  },
+})
+```
+
+---
+
+## Refresh Endpoint
+
+<ParamField body="endpoints.refresh" type="HTTPRequest">
+  The endpoint called when the access token needs to be renewed. The scheme posts the current refresh token to this URL and stores the tokens returned in the response.
+
+  **Default:** `{ url: '/api/auth/refresh', method: 'POST' }`
+</ParamField>
+
+---
+
+## Refresh Token Options
+
+<ParamField body="refreshToken.property" type="string | false">
+  The dot-notation path inside the refresh response body where the new refresh token lives. Set to `false` if the server only returns a new access token without rotating the refresh token.
+
+  **Default:** `'refresh_token'`
+</ParamField>
+
+<ParamField body="refreshToken.data" type="string | false">
+  The key used in the refresh request body when sending the current refresh token to the server. Set to `false` to omit it from the request body (e.g. when using `httpOnly` cookies).
+
+  **Default:** `'refresh_token'`
+</ParamField>
+
+<ParamField body="refreshToken.maxAge" type="number | false">
+  The refresh token's lifetime in seconds. The scheme uses this value to determine when the refresh token itself has expired and a full re-login is required.
+
+  **Default:** `2592000` (30 days)
+</ParamField>
+
+<ParamField body="refreshToken.required" type="boolean">
+  When `true`, the absence of a refresh token is treated as an invalid session. Set to `false` if refresh tokens are optional in your flow.
+
+  **Default:** `true`
+</ParamField>
+
+<ParamField body="refreshToken.tokenRequired" type="boolean">
+  When `false`, the current access token is removed from the request header before sending the refresh request. This is the correct behaviour for most backends. Set to `true` only if your refresh endpoint explicitly requires the (expired) access token in the `Authorization` header.
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="refreshToken.prefix" type="string">
+  The key prefix used when persisting the refresh token in storage.
+
+  **Default:** `'_refresh_token.'`
+</ParamField>
+
+<ParamField body="refreshToken.expirationPrefix" type="string">
+  The key prefix used when persisting the refresh token expiration timestamp in storage.
+
+  **Default:** `'_refresh_token_expiration.'`
+</ParamField>
+
+<ParamField body="refreshToken.httpOnly" type="boolean">
+  When `true`, the refresh token is expected to be stored in an `httpOnly` cookie managed by the server rather than in JavaScript-accessible storage. The scheme will not include the refresh token in the refresh request body, relying on the browser to send the cookie automatically.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
+## Auto-Logout
+
+<ParamField body="autoLogout" type="boolean">
+  When `true`, the scheme immediately resets the session if the access token is found to be expired on mount and no valid refresh token is available to renew it. When `false`, the expired state is ignored on mount and the scheme waits for the first protected request to trigger a refresh attempt.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
+## Manual Token Refresh
+
+You can trigger a token refresh programmatically at any time. The scheme will call the refresh endpoint, update the stored tokens, and continue silently:
+
+```ts
+const auth = useAuth()
+await auth.refreshTokens()
+```
+
+<Note>
+  `refreshTokens()` is a no-op if the refresh endpoint is disabled or if there is no valid refresh token in storage. It throws an `ExpiredAuthSessionError` if the refresh token itself has expired.
+</Note>
+
+---
+
+## Setting Tokens Manually
+
+Use `setUserToken` when you already have tokens from a server-side exchange (e.g. during SSR authentication or a custom OAuth callback handler) and want to inject them without going through the login endpoint:
+
+```ts
+const auth = useAuth()
+await auth.setUserToken('access_token_value', 'refresh_token_value')
+```
+
+This stores both tokens, then automatically calls `fetchUser` to populate the user object.
+
+---
+
+## Inherited Options
+
+The `refresh` scheme inherits all options from the [Local scheme](/schemes/local), including `token`, `endpoints.login`, `endpoints.logout`, `endpoints.user`, `user`, `clientId`, `grantType`, `scope`, and `ssr`. All of those options apply here without modification.

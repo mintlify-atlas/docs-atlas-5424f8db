@@ -1,0 +1,234 @@
+---
+title: "Migrating from @nuxtjs/auth to @nuxt-alt/auth"
+sidebarTitle: "Migration"
+description: "Step-by-step guide to migrating from @nuxtjs/auth or @nuxtjs/auth-next to @nuxt-alt/auth in a Nuxt 3 project, including breaking changes and API differences."
+---
+
+`@nuxt-alt/auth` is a Nuxt 3-only rewrite of `@nuxtjs/auth`. The API is intentionally familiar — the same strategy names, the same redirect configuration keys, the same composable name — but there are important differences in how tokens are stored, how HTTP requests are made, and how the module integrates with the Nuxt 3 ecosystem. This guide covers every breaking change and highlights the new features you gain after migrating.
+
+<Warning>
+  `@nuxt-alt/auth` has **no backwards compatibility** with Nuxt 2 or `@nuxtjs/auth-next`. It requires Nuxt 3 (`^3.0.0`) and will not install or function correctly in a Nuxt 2 project.
+</Warning>
+
+## Breaking Changes
+
+### 1. Package Name
+
+Remove the old package and install the new one along with its required HTTP module:
+
+```bash
+# Remove the old package
+npm uninstall @nuxtjs/auth-next
+
+# Install the new packages
+npm install @nuxt-alt/auth @nuxt-alt/http
+```
+
+Add `@nuxt-alt/auth` to the `modules` array in `nuxt.config.ts`. You do not need to add `@nuxt-alt/http` manually — the auth module installs it automatically — but if you do add it explicitly, make sure it appears **after** `@nuxt-alt/auth` and **before** any proxy module.
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  modules: [
+    '@nuxt-alt/auth',
+    // '@nuxt-alt/http' — optional, auto-installed
+  ],
+  auth: {
+    /* module options */
+  },
+})
+```
+
+### 2. Module Config Key
+
+The configuration key remains `auth` in `nuxt.config.ts`. No change is required here.
+
+### 3. HTTP Request Body: `data` → `body`
+
+`@nuxtjs/auth-next` used `axios` under the hood, which accepts a `data` property for the request body. `@nuxt-alt/auth` uses `@nuxt-alt/http` (built on `ofetch`), which uses `body` instead. Every place where you passed `data` to `loginWith()` or `login()` must be updated.
+
+```ts
+// Before (@nuxtjs/auth-next with axios)
+await auth.loginWith('local', { data: { email, password } })
+
+// After (@nuxt-alt/auth with ofetch)
+await auth.loginWith('local', { body: { email, password } })
+```
+
+This change applies to any custom `auth.request()` or `auth.requestWith()` calls that previously used `data` as well.
+
+### 4. Default Storage Changed
+
+`@nuxtjs/auth` enabled `localStorage` by default. `@nuxt-alt/auth` defaults to cookie storage and disables both `localStorage` and `sessionStorage`. This is intentional: cookies work in SSR environments; `localStorage` does not.
+
+```ts
+// @nuxtjs/auth-next default (implicit)
+stores: {
+  local: { enabled: true },    // was the default
+}
+
+// @nuxt-alt/auth default
+stores: {
+  cookie:  { enabled: true },  // new default — SSR-safe
+  local:   { enabled: false }, // changed from true
+  session: { enabled: false }, // changed from true
+}
+```
+
+If your application relied on `localStorage` for token persistence between tabs or for very long-lived sessions, you can re-enable it — but be aware it will not be read during SSR rendering.
+
+### 5. Pinia Replaces Vuex
+
+`@nuxtjs/auth` required a Vuex store and wrote auth state directly into it. `@nuxt-alt/auth` uses Nuxt 3's `useState` by default (no dependency required) and optionally supports Pinia.
+
+```ts
+// Before: Vuex was required — no configuration needed, it was automatic
+// store/index.js had to exist for the module to work
+
+// After: useState is used by default
+// Opt into Pinia if you prefer:
+stores: {
+  pinia: {
+    enabled: true,
+    namespace: 'auth',
+  },
+}
+```
+
+Remove any `store/index.js` or Vuex setup that existed solely to satisfy the old auth module.
+
+### 6. `$auth.strategy` Type Change
+
+In `@nuxtjs/auth`, the `strategy` getter returned a type that included `token` and `refreshToken` properties. In `@nuxt-alt/auth`, `strategy` returns the base `Scheme` type, which does not include those properties. Two additional typed getters have been added for token-specific access.
+
+```ts
+// Before (@nuxtjs/auth)
+$auth.strategy.token.get()          // worked — token was on the base type
+$auth.strategy.refreshToken.get()   // worked — refreshToken was on the base type
+
+// After (@nuxt-alt/auth)
+$auth.strategy                      // base Scheme — no token/refreshToken
+$auth.tokenStrategy.token?.get()    // TokenableScheme — use for token access
+$auth.refreshStrategy.refreshToken.get() // RefreshableScheme — use for refresh token
+```
+
+Update every location in your codebase that accesses `$auth.strategy.token` or `$auth.strategy.refreshToken` to use the appropriate typed getter instead.
+
+## What Stayed the Same
+
+The following parts of the API are compatible with `@nuxtjs/auth` and require no changes:
+
+<CardGroup cols={2}>
+  <Card title="Config key" icon="gear">
+    `auth:` in `nuxt.config.ts` works exactly as before.
+  </Card>
+  <Card title="Strategy names" icon="layer-group">
+    `local`, `cookie`, `oauth2`, `openIDConnect`, `refresh` — all unchanged.
+  </Card>
+  <Card title="Provider names" icon="plug">
+    `auth0`, `github`, `google`, `facebook`, `discord`, `laravelSanctum`, `laravelPassport`, `laravelJWT`.
+  </Card>
+  <Card title="useAuth() composable" icon="code">
+    The composable name and its return value are identical.
+  </Card>
+  <Card title="Page meta" icon="file">
+    `definePageMeta({ auth: ... })` works the same way.
+  </Card>
+  <Card title="Redirect keys" icon="arrow-right">
+    `redirect.login`, `redirect.logout`, `redirect.callback`, `redirect.home`.
+  </Card>
+  <Card title="Core methods" icon="bolt">
+    `$auth.loggedIn`, `$auth.user`, `$auth.login()`, `$auth.logout()`, `$auth.fetchUser()`, `$auth.reset()`.
+  </Card>
+  <Card title="Error handling" icon="triangle-exclamation">
+    `$auth.onError()` listener registration works the same way.
+  </Card>
+</CardGroup>
+
+## New Features in @nuxt-alt/auth
+
+Migrating from `@nuxtjs/auth` also gives you access to features that did not exist in the original module:
+
+<Accordion title="tokenValidationInterval — periodic token expiry checking">
+  Set to `true` (1000ms default) or a number of milliseconds to enable a background interval that continuously checks token expiry and triggers a refresh or reset as needed. This catches expired tokens even when the user is idle on the same page.
+
+  ```ts
+  auth: {
+    tokenValidationInterval: 5000, // check every 5 seconds
+  }
+  ```
+</Accordion>
+
+<Accordion title="resetOnResponseError — automatic 401 handling">
+  When enabled, any 401 response from any auth request triggers an automatic reset. You can also pass a function for full control:
+
+  ```ts
+  auth: {
+    resetOnResponseError: (error, auth, scheme) => {
+      if (error.response?.status === 401) {
+        scheme.reset?.()
+        auth.redirect('login')
+      }
+    },
+  }
+  ```
+</Accordion>
+
+<Accordion title="redirectStrategy: 'query' — query-parameter redirects">
+  In addition to the default `storage` strategy (which stores the redirect target in `localStorage`/cookies), you can use `query` to append `?to=...` to the login URL. This is useful for shareable login links.
+
+  ```ts
+  auth: {
+    redirectStrategy: 'query',
+  }
+  ```
+</Accordion>
+
+<Accordion title="stores.state.namespace — useState namespace">
+  Customize the key used by Nuxt's `useState` for auth state. Useful when you have multiple auth-related state slices and want to avoid key collisions.
+
+  ```ts
+  auth: {
+    stores: {
+      state: { namespace: 'myAppAuth' },
+    },
+  }
+  ```
+</Accordion>
+
+<Accordion title="OAuth2 clientWindow — popup authentication">
+  The OAuth2 strategy now supports a popup-based login flow, so users don't leave the current page during OAuth authorization.
+
+  ```ts
+  auth: {
+    strategies: {
+      github: {
+        clientWindow: true,
+        clientWidth: 400,
+        clientHeight: 600,
+      },
+    },
+  }
+  ```
+</Accordion>
+
+<Accordion title="TypeScript UserInfo augmentation">
+  Extend the `UserInfo` interface via declaration merging to get full type safety on `auth.user`:
+
+  ```ts
+  declare module '@nuxt-alt/auth' {
+    interface UserInfo {
+      id: number
+      email: string
+      role: 'admin' | 'user'
+    }
+  }
+  ```
+</Accordion>
+
+<Accordion title="Module path aliases">
+  Three path aliases are available for building custom schemes and providers:
+
+  - `#auth/runtime` — core classes and middleware
+  - `#auth/providers` — built-in provider configurations
+  - `#auth/utils` — shared utility functions
+</Accordion>

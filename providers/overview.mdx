@@ -1,0 +1,80 @@
+---
+title: "Pre-Built OAuth and API Providers"
+sidebarTitle: "Overview"
+description: "@nuxt-alt/auth ships pre-configured providers for Auth0, GitHub, Google, Facebook, Discord, Laravel Sanctum, Laravel Passport, and Laravel JWT."
+---
+
+Providers are pre-configured strategy presets that wire up endpoints, scopes, token settings, and scheme defaults for popular authentication backends. Instead of manually specifying every endpoint URL and option, you pick a provider and supply only the secrets and overrides specific to your app. Providers are imported from the `#auth/providers` virtual module and take effect at build time through the Nuxt module.
+
+## How Providers Work
+
+Each provider is a function that receives your partial strategy config and merges sensible defaults onto it before the module finalises its build-time configuration. Importing a provider does not add any runtime overhead — the merge happens during the Nuxt build.
+
+```ts
+import { github } from '#auth/providers'
+// Internally the provider pre-fills:
+// endpoints.authorization = 'https://github.com/login/oauth/authorize'
+// endpoints.token         = 'https://github.com/login/oauth/access_token'
+// endpoints.userInfo      = 'https://api.github.com/user'
+// scope                   = ['user', 'email']
+// scheme                  = 'oauth2'
+// … and more OAuth2 defaults
+```
+
+You do not call the provider function yourself. The module detects known provider names in your `strategies` config and applies the matching provider automatically.
+
+## Available Providers
+
+<CardGroup cols={3}>
+  <Card title="Auth0" href="/providers/auth0">
+    Auth0 OAuth2 with authorization code flow, PKCE, and the Auth0 userinfo endpoint.
+  </Card>
+  <Card title="GitHub" href="/providers/github">
+    GitHub OAuth2 authorization code flow with server-side token exchange via a Nuxt API route.
+  </Card>
+  <Card title="Google" href="/providers/google">
+    Google OAuth2 with the Google People API userinfo endpoint.
+  </Card>
+  <Card title="Facebook" href="/providers/facebook">
+    Facebook Login via OAuth2 and the Facebook Graph API.
+  </Card>
+  <Card title="Discord" href="/providers/discord">
+    Discord OAuth2 with PKCE (S256) and the Discord users/@me endpoint.
+  </Card>
+  <Card title="Laravel Sanctum" href="/providers/laravel-sanctum">
+    Cookie-based session auth with CSRF protection for Laravel Sanctum.
+  </Card>
+  <Card title="Laravel Passport" href="/providers/laravel-passport">
+    Laravel Passport OAuth2 — supports authorization code and password grant flows.
+  </Card>
+  <Card title="Laravel JWT" href="/providers/laravel-jwt">
+    Token-based authentication with Laravel JWT and automatic refresh support.
+  </Card>
+</CardGroup>
+
+## Configuring a Provider
+
+Because providers auto-fill defaults, your `nuxt.config.ts` only needs the strategy name (which must match a known provider) plus the credentials and any overrides you want.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      github: {
+        clientId: 'YOUR_CLIENT_ID',
+        clientSecret: 'YOUR_CLIENT_SECRET',
+      },
+      discord: {
+        clientId: 'YOUR_CLIENT_ID',
+        clientSecret: 'YOUR_CLIENT_SECRET',
+      },
+    },
+  },
+})
+```
+
+The `scheme`, endpoint URLs, default scopes, and token settings are all applied automatically. You can still override any individual field — values you provide always take precedence over the provider defaults.
+
+<Note>
+  Strategy names must match a known provider identifier for auto-configuration to apply. The recognised names are `auth0`, `github`, `google`, `facebook`, `discord`, `laravelSanctum`, `laravelPassport`, and `laravelJWT`. The aliases `laravel/sanctum`, `laravel/passport`, and `laravel/jwt` are also supported and are normalised to their camelCase equivalents at build time.
+</Note>

@@ -1,0 +1,92 @@
+---
+title: "Laravel JWT Provider for @nuxt-alt/auth"
+sidebarTitle: "Laravel JWT"
+description: "Configure @nuxt-alt/auth with Laravel JWT for token-based authentication using the local scheme with JWT access tokens and refresh token support."
+---
+
+The Laravel JWT provider configures `@nuxt-alt/auth` to authenticate users against a Laravel backend using [tymon/jwt-auth](https://github.com/tymondesigns/jwt-auth) or a compatible JWT library. It uses the dedicated `laravelJWT` scheme, which extends the refresh scheme with JWT-specific defaults — including a short-lived access token, a long-lived refresh window, and server-side token refresh via the Authorization header (rather than a refresh token payload). All endpoint URLs are derived from the `url` you supply.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `url` | `string` | The base URL of your Laravel application, e.g. `http://localhost:8000` |
+
+## Configuration
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelJWT: {
+        url: 'http://localhost:8000',
+        // Optional: enable SSR server-side auth handling
+        ssr: false,
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+When the strategy name is `laravelJWT`, the provider automatically sets the following values. Any property you specify in your own config takes precedence.
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'laravelJWT'` |
+| `endpoints.login.url` | `{url}/api/auth/login` |
+| `endpoints.refresh.url` | `{url}/api/auth/refresh` |
+| `endpoints.logout.url` | `{url}/api/auth/logout` |
+| `endpoints.user.url` | `{url}/api/auth/user` |
+| `token.property` | `'access_token'` |
+| `token.maxAge` | `3600` (1 hour, in seconds) |
+| `refreshToken.property` | `false` |
+| `refreshToken.data` | `false` |
+| `refreshToken.maxAge` | `1209600` (14 days, in seconds) |
+| `refreshToken.required` | `false` |
+| `refreshToken.tokenRequired` | `true` |
+| `user.property` | `false` |
+| `clientId` | `false` (disabled) |
+| `grantType` | `false` (disabled) |
+
+<Tip>
+  The `refreshToken.tokenRequired: true` setting means the refresh request sends the current JWT in the `Authorization` header rather than a separate refresh token in the request body. This matches the behaviour of `tymon/jwt-auth`'s `/api/auth/refresh` endpoint, which re-issues a new token based on the still-valid (but expired) JWT presented in the header.
+</Tip>
+
+## SSR Support
+
+When `ssr: true` is set, the provider registers a Nuxt server route via `addLocalAuthorize` to handle authentication server-side during SSR. This enables fully authenticated server-rendered pages on the first request.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelJWT: {
+        url: 'http://localhost:8000',
+        ssr: true,
+      },
+    },
+  },
+})
+```
+
+## Logging In
+
+Submit credentials directly to the login endpoint:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('laravelJWT', {
+  body: {
+    email: 'user@example.com',
+    password: 'password',
+  },
+})
+```
+
+On a successful login, the JWT returned in the `access_token` field is stored and attached as a `Bearer` token on all subsequent requests. When the token reaches its `maxAge` of 3600 seconds, `@nuxt-alt/auth` automatically calls the refresh endpoint with the current JWT in the `Authorization` header to obtain a fresh token.
+
+<Note>
+  Ensure your Laravel routes match the auto-configured endpoint paths (`/api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/user`). If your routes use different paths, override the individual endpoint URLs in your strategy config. Your Laravel `api` middleware group must also allow the `Authorization` header through CORS for token-based requests to work correctly.
+</Note>

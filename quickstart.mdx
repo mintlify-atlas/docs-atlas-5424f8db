@@ -1,47 +1,151 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with @nuxt-alt/auth in Minutes"
+sidebarTitle: "Quickstart"
+description: "Set up local token authentication in a Nuxt 3 app with @nuxt-alt/auth — from installation to a working login form in four steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+This guide walks you through the most common `@nuxt-alt/auth` setup: local token authentication, where your own API issues a Bearer token on login and the module stores, attaches, and validates it automatically. By the end you will have a configured strategy, a working login page, a component that reads the authenticated user, and route-level protection — all wired together with the built-in middleware and the `useAuth()` composable.
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
 
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+<Step title="Install and Configure">
 
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+If you have not installed the module yet, follow the [Installation](/installation) guide, then add a `local` strategy to your `nuxt.config.ts`. The `local` scheme posts credentials to your login endpoint, reads the token from the response, and calls the user endpoint to hydrate `auth.user`.
 
-    ```bash
-    your-cli start
-    ```
-  </Step>
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['@nuxt-alt/auth'],
+  auth: {
+    strategies: {
+      local: {
+        token: {
+          property: 'token',
+          type: 'Bearer',
+        },
+        endpoints: {
+          login:  { url: '/api/auth/login',  method: 'post' },
+          logout: { url: '/api/auth/logout', method: 'post' },
+          user:   { url: '/api/auth/user',   method: 'get'  },
+        },
+      },
+    },
+  },
+})
+```
+
+- `token.property` is the key in your login response JSON that holds the token value (e.g. `{ "token": "eyJ..." }`).
+- `token.type` is prepended to the token in the `Authorization` header — `Bearer` is the standard for most REST APIs.
+- `endpoints.user` is called automatically after login to populate `auth.user`.
+
+</Step>
+
+<Step title="Create a Login Page">
+
+Create `pages/login.vue`. Call `auth.loginWith('local', { body: { ... } })` to initiate the login flow. The module posts the body to your configured login endpoint, extracts the token, stores it, then fetches the user profile — all in one call. Use `body` (not `data`) because `@nuxt-alt/http` is built on `ofetch`.
+
+```vue pages/login.vue
+<script setup lang="ts">
+const auth = useAuth()
+const email = ref('')
+const password = ref('')
+
+async function handleLogin() {
+  await auth.loginWith('local', {
+    body: { email: email.value, password: password.value },
+  })
+}
+</script>
+
+<template>
+  <form @submit.prevent="handleLogin">
+    <input v-model="email" type="email" placeholder="Email" />
+    <input v-model="password" type="password" placeholder="Password" />
+    <button type="submit">Sign in</button>
+  </form>
+</template>
+```
+
+After a successful login, the module redirects the user to the path configured in `auth.redirect.home` (defaults to `/`).
+
+</Step>
+
+<Step title="Access the Authenticated User">
+
+`useAuth()` is auto-imported everywhere in your Nuxt app. Use `auth.loggedIn` to check authentication status and `auth.user` to read the profile object returned by your user endpoint. Calling `auth.logout()` clears all stored tokens and redirects to `auth.redirect.logout`.
+
+```vue components/NavBar.vue
+<script setup lang="ts">
+const auth = useAuth()
+</script>
+
+<template>
+  <div v-if="auth.loggedIn">
+    <p>Welcome, {{ auth.user?.name }}</p>
+    <button @click="auth.logout()">Sign out</button>
+  </div>
+  <div v-else>
+    <NuxtLink to="/login">Sign in</NuxtLink>
+  </div>
+</template>
+```
+
+`auth.user` is typed as `UserInfo` — augment that interface in a `.d.ts` file to get full IntelliSense on your user object's shape (see the [Installation](/installation) page for an example).
+
+</Step>
+
+<Step title="Protect a Page">
+
+`@nuxt-alt/auth` registers a built-in route middleware named `auth`. You activate it per-page with `definePageMeta` — no manual middleware imports needed.
+
+**Require authentication** — unauthenticated visitors are redirected to `auth.redirect.login`:
+
+```vue pages/dashboard.vue
+<script setup lang="ts">
+definePageMeta({ auth: true })
+</script>
+```
+
+**Guest-only page** — authenticated users are redirected away (useful for login and register pages):
+
+```vue pages/login.vue
+<script setup lang="ts">
+// Redirect logged-in users away from this page
+definePageMeta({ auth: 'guest' })
+</script>
+```
+
+**Opt out entirely** — the page is publicly accessible regardless of auth state:
+
+```vue pages/about.vue
+<script setup lang="ts">
+// This page is publicly accessible
+definePageMeta({ auth: false })
+</script>
+```
+
+To apply the middleware globally to every route by default, set `globalMiddleware: true` in your module options, then use `auth: false` on pages you want to keep public.
+
+</Step>
+
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Next Steps
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+<CardGroup cols={2}>
+  <Card title="Local Scheme" icon="key" href="/schemes/local">
+    Full reference for the local scheme — token refresh, cookie storage,
+    custom headers, and all available endpoint options.
+  </Card>
+  <Card title="OAuth2 Scheme" icon="arrow-right-arrow-left" href="/schemes/oauth2">
+    Configure OAuth2 authorization code flows with PKCE, client-window popup
+    authentication, and custom token endpoints.
+  </Card>
+  <Card title="Pre-built Providers" icon="plug" href="/providers/overview">
+    Drop-in provider factories for GitHub, Google, Discord, and other popular
+    OAuth2 services — minimal configuration required.
+  </Card>
+  <Card title="Module Options" icon="sliders" href="/configuration/module-options">
+    Complete reference for every module-level option: redirect paths, storage
+    backends, token validation intervals, and error handling hooks.
+  </Card>
+</CardGroup>

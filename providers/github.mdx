@@ -1,0 +1,64 @@
+---
+title: "GitHub OAuth Provider for @nuxt-alt/auth"
+sidebarTitle: "GitHub"
+description: "Configure GitHub OAuth2 login in @nuxt-alt/auth using the github provider, with authorization code flow and GitHub API user info."
+---
+
+The GitHub provider configures `@nuxt-alt/auth` to authenticate users through GitHub OAuth. It uses the `oauth2` scheme with a server-side token exchange — because GitHub returns access tokens from a back-end request rather than in a URL fragment, the provider calls `addAuthorize` to register a Nuxt server route that performs the token exchange on behalf of the browser. This means your `clientSecret` stays on the server and is never exposed to the client.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `clientId` | `string` | The Client ID of your GitHub OAuth App |
+| `clientSecret` | `string` | The Client Secret of your GitHub OAuth App |
+
+## Configuration
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      github: {
+        clientId: 'YOUR_CLIENT_ID',
+        clientSecret: 'YOUR_CLIENT_SECRET',
+        // Optional: override the default scopes
+        scope: ['user', 'email'],
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+When the strategy name is `github`, the provider automatically sets the following values. Any property you specify in your own config takes precedence.
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'oauth2'` |
+| `endpoints.authorization` | `https://github.com/login/oauth/authorize` |
+| `endpoints.token` | `https://github.com/login/oauth/access_token` |
+| `endpoints.userInfo` | `https://api.github.com/user` |
+| `scope` | `['user', 'email']` |
+| `token.property` | `'access_token'` |
+| `token.type` | `'Bearer'` |
+| `token.name` | `'Authorization'` |
+| `refreshToken.property` | `'refresh_token'` |
+| `responseType` | `'token'` |
+| `clientSecretTransport` | `'body'` |
+
+## Logging In
+
+Trigger the GitHub OAuth redirect from any component or composable:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('github')
+```
+
+The user is redirected to GitHub's authorization page. After granting access, GitHub redirects back to your application. The registered Nuxt server route then exchanges the authorization code for an access token server-side, so the secret is never sent to the browser.
+
+<Note>
+  In your GitHub OAuth App settings, set the **Authorization callback URL** to match your application's callback route. The default used by `@nuxt-alt/auth` is `/login`. Navigate to **Settings → Developer settings → OAuth Apps** in your GitHub account to configure this.
+</Note>

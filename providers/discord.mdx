@@ -1,0 +1,70 @@
+---
+title: "Discord OAuth Provider for @nuxt-alt/auth"
+sidebarTitle: "Discord"
+description: "Configure Discord OAuth2 login in @nuxt-alt/auth using the discord provider with authorization code flow and Discord API user info."
+---
+
+The Discord provider configures `@nuxt-alt/auth` to authenticate users through Discord's OAuth2 service. It uses the `oauth2` scheme with the authorization code grant type and PKCE challenge method set to `S256`, providing an additional layer of security during the code exchange. Because the token endpoint requires a server-side request, the provider registers a Nuxt server route via `addAuthorize` (with PKCE enabled) to perform the exchange, keeping your `clientSecret` off the browser. The user profile is fetched from the Discord REST API after a successful login.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `clientId` | `string` | The Client ID of your Discord application |
+| `clientSecret` | `string` | The Client Secret of your Discord application |
+
+## Configuration
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      discord: {
+        clientId: 'YOUR_CLIENT_ID',
+        clientSecret: 'YOUR_CLIENT_SECRET',
+        // Optional: override the default scopes
+        scope: ['identify', 'email'],
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+When the strategy name is `discord`, the provider automatically sets the following values. Any property you specify in your own config takes precedence.
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'oauth2'` |
+| `endpoints.authorization` | `https://discord.com/api/oauth2/authorize` |
+| `endpoints.token` | `https://discord.com/api/oauth2/token` |
+| `endpoints.userInfo` | `https://discord.com/api/users/@me` |
+| `grantType` | `'authorization_code'` |
+| `codeChallengeMethod` | `'S256'` |
+| `scope` | `['identify', 'email']` |
+| `token.property` | `'access_token'` |
+| `token.type` | `'Bearer'` |
+| `token.name` | `'Authorization'` |
+| `refreshToken.property` | `'refresh_token'` |
+| `responseType` | `'token'` |
+| `clientSecretTransport` | `'body'` |
+
+<Tip>
+  The Discord provider does not auto-configure a logout endpoint. Discord requires a `POST` request to `https://discord.com/api/oauth2/token/revoke` to revoke a token. If you need explicit token revocation on logout, configure the `endpoints.logout` property manually in your strategy config.
+</Tip>
+
+## Logging In
+
+Trigger the Discord OAuth redirect from any component or composable:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('discord')
+```
+
+The user is redirected to Discord's authorization page. After granting access, Discord redirects back to your application's callback route. The registered server route exchanges the authorization code (and PKCE verifier) for an access token, then `@nuxt-alt/auth` fetches the user's profile from the Discord API.
+
+<Note>
+  In your Discord application's OAuth2 settings, add your application's callback URL to the **Redirects** list. Navigate to the [Discord Developer Portal](https://discord.com/developers/applications), select your application, and go to **OAuth2 → General**. The default callback route used by `@nuxt-alt/auth` is `/login`.
+</Note>

@@ -1,0 +1,175 @@
+---
+title: "Configure Authentication Storage Backends"
+sidebarTitle: "Storage"
+description: "Configure how @nuxt-alt/auth persists tokens and state using cookies, localStorage, sessionStorage, Pinia, or Nuxt useState across SSR and client environments."
+---
+
+`@nuxt-alt/auth` separates the concern of reactive state (what your components read) from persistent storage (what survives a page reload or a server round-trip). The `Storage` class manages both layers simultaneously: reactive state is held in either Nuxt's `useState` or a Pinia store, while tokens and other auth values are persisted across sessions through cookies, `localStorage`, or `sessionStorage`. Multiple backends can be active at the same time, and the module keeps them in sync automatically.
+
+---
+
+## How the Storage Class Resolves Values
+
+When `getUniversal(key)` is called, the `Storage` class walks through the enabled backends in a fixed priority order and returns the first non-empty value it finds:
+
+1. **Cookie** — checked first on the client because it is the most authoritative persistent source
+2. **localStorage** — checked next if enabled
+3. **sessionStorage** — checked next if enabled
+4. **State (useState / Pinia)** — checked last as the in-memory fallback
+
+On the **server**, reactive state is tried *first* because cookies are the only other backend available during SSR. Browser-only backends (`localStorage`, `sessionStorage`) are skipped entirely on the server.
+
+<Note>
+  `setUniversal`, `getUniversal`, `syncUniversal`, and `removeUniversal` are available on `$auth.$storage` and operate across all enabled stores simultaneously. Use them when you need to read or write a value in a backend-agnostic way.
+</Note>
+
+---
+
+## Cookie Storage (default, SSR-safe)
+
+Cookies are enabled by default and are the recommended primary persistence backend. Because cookies are included in every HTTP request, tokens stored as cookies are accessible on the server during SSR — making this the only backend that works seamlessly in a universal (SSR + client) Nuxt application.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    stores: {
+      cookie: {
+        enabled: true,      // default
+        prefix: 'auth.',    // default — e.g. "auth.token", "auth.strategy"
+        options: {
+          path: '/',
+          sameSite: 'lax',
+          maxAge: 31536000, // 1 year in seconds
+        },
+      },
+    },
+  },
+})
+```
+
+The `options` object is passed directly to [`cookie-es`](https://github.com/unjs/cookie-es) when serializing each cookie. Any [`CookieSerializeOptions`](https://github.com/unjs/cookie-es) field is accepted:
+
+| Option | Type | Description |
+|---|---|---|
+| `path` | `string` | Cookie path scope. Defaults to `'/'`. |
+| `sameSite` | `'lax' \| 'strict' \| 'none'` | Cross-site cookie policy. Defaults to `'lax'`. |
+| `maxAge` | `number` | Lifetime in seconds. Defaults to `31536000` (1 year). |
+| `domain` | `string` | Cookie domain scope. |
+| `secure` | `boolean` | Restrict to HTTPS. Automatically set to `true` in production. |
+| `httpOnly` | `boolean` | Prevent JavaScript access to the cookie. |
+
+<Tip>
+  In production (`NODE_ENV === 'production'`), the `secure` flag is automatically applied so you don't need to set it manually.
+</Tip>
+
+---
+
+## Nuxt useState (default reactive state)
+
+By default, `@nuxt-alt/auth` uses Nuxt's built-in `useState` composable to create a reactive, SSR-aware state store. No additional packages are required. This is the default reactive layer — it stores transient values like the `user` object and `loggedIn` flag that your components read reactively.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    stores: {
+      state: {
+        namespace: 'auth', // default
+      },
+    },
+  },
+})
+```
+
+Changing `namespace` renames the `useState` key from `'auth'` to your chosen value. This is only necessary if `'auth'` conflicts with another `useState` call in your codebase.
+
+---
+
+## Pinia Store (optional)
+
+Pinia is an optional replacement for `useState` as the reactive state layer. When enabled, the auth module creates a Pinia store with the given `namespace` and patches it reactively instead of writing to a `useState` ref. This is useful if you prefer Pinia's devtools integration or want to use Pinia actions and getters alongside auth state.
+
+To use the Pinia store, install `@pinia/nuxt` and add it to your modules list:
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@nuxt-alt/auth',
+    '@pinia/nuxt',
+  ],
+  auth: {
+    stores: {
+      pinia: {
+        enabled: true,
+        namespace: 'auth', // Pinia store ID
+      },
+    },
+  },
+})
+```
+
+<Note>
+  The Pinia store is only activated when `stores.pinia.enabled` is `true` **and** `@pinia/nuxt` is present. If either condition is not met, the module silently falls back to `useState`.
+</Note>
+
+---
+
+## localStorage
+
+`localStorage` is a browser-only persistence backend that survives page reloads and browser restarts (until explicitly cleared or the user's storage quota is reached). It is disabled by default.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    stores: {
+      local: {
+        enabled: true,
+        prefix: 'auth.', // default — e.g. "auth.token"
+      },
+    },
+  },
+})
+```
+
+<Warning>
+  `localStorage` is not available during SSR. The module automatically skips this backend on the server. If you rely solely on `localStorage` for token persistence, the server will not have access to the token during the initial server-rendered request.
+</Warning>
+
+---
+
+## sessionStorage
+
+`sessionStorage` works like `localStorage` but is scoped to a single browser tab — its contents are cleared when the tab or window is closed. It is disabled by default and is best suited for high-security flows where you want tokens to expire with the session.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    stores: {
+      session: {
+        enabled: true,
+        prefix: 'auth.', // default — e.g. "auth.token"
+      },
+    },
+  },
+})
+```
+
+<Warning>
+  `sessionStorage` is not available during SSR. The module automatically skips this backend on the server. Do not use `sessionStorage` as your only persistence backend if your application relies on server-side rendering of authenticated content.
+</Warning>
+
+---
+
+## Universal Storage API
+
+The `$auth.$storage` object exposes a set of methods that read from and write to all enabled backends at once, following the priority order described above. These are the primary methods you will use when building custom strategies or extending the module.
+
+| Method | Description |
+|---|---|
+| `setUniversal(key, value, include?)` | Writes `value` to all included stores and reactive state. Pass `null` or `undefined` to remove the key. |
+| `getUniversal(key)` | Returns the first non-empty value found across backends in priority order. |
+| `syncUniversal(key, defaultValue?, include?)` | Reads the current value and propagates it to any backends that don't already have it. Falls back to `defaultValue` if unset everywhere. |
+| `removeUniversal(key)` | Deletes the key from reactive state, cookies, `localStorage`, and `sessionStorage`. |
+
+<Note>
+  The optional `include` parameter on `setUniversal` and `syncUniversal` is a `{ cookie, local, session }` flags object that lets you write to only a subset of backends in a single call. For example, `{ cookie: false }` writes to `localStorage` and `sessionStorage` but not to cookies.
+</Note>

@@ -1,0 +1,77 @@
+---
+title: "@nuxt-alt/auth: Nuxt 3 Authentication Module"
+sidebarTitle: "Introduction"
+description: "@nuxt-alt/auth is a Nuxt 3 alternative to @nuxtjs/auth with local, cookie, OAuth2, and OpenID Connect schemes, SSR support, and a useAuth() composable."
+---
+
+`@nuxt-alt/auth` is a full-featured authentication module built exclusively for Nuxt 3. It brings battle-tested authentication patterns — local token auth, cookie-based sessions, OAuth2 flows, and OpenID Connect — into the modern Nuxt 3 ecosystem, wrapped in a clean composable API and first-class SSR support. Whether you are securing a simple SPA with a username/password form or wiring up a social login via GitHub or Discord, `@nuxt-alt/auth` provides the scheme primitives, provider factories, and middleware plumbing to get there without boilerplate.
+
+## Why @nuxt-alt/auth?
+
+The original `@nuxtjs/auth` module was designed for Nuxt 2 and is no longer maintained for the Nuxt 3 runtime. `@nuxt-alt/auth` is its spiritual successor — rewritten from the ground up for Nuxt 3, typed throughout, and extended with new capabilities like Pinia store integration, a configurable redirect strategy, token validation intervals, and a popup-based OAuth2 client window. It intentionally drops Nuxt 2 backwards compatibility so it can fully embrace Nuxt 3 conventions: auto-imports, `useState`, Nitro server handlers, and the `definePageMeta` middleware system.
+
+<Note>
+  `@nuxt-alt/auth` uses `@nuxt-alt/http` under the hood, which itself extends
+  `ofetch`. If you were previously using `data` to send POST payloads (as in
+  Axios-based setups), you must switch to `body` — that is the key name
+  `ofetch` expects for request bodies.
+</Note>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Schemes" icon="shield-halved" href="/schemes/local">
+    Built-in schemes for local token auth, cookie auth, OAuth2, and OpenID
+    Connect — each fully configurable with custom endpoints, token properties,
+    and refresh logic.
+  </Card>
+  <Card title="Providers" icon="plug" href="/providers/overview">
+    Pre-built provider factories for popular OAuth2 services such as GitHub,
+    Google, Discord, and more — zero-boilerplate social login setup.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/configuration/module-options">
+    Fine-grained module options covering redirect strategies, storage backends
+    (cookie, localStorage, sessionStorage, Pinia, `useState`), token validation
+    intervals, and error handling hooks.
+  </Card>
+  <Card title="Composable" icon="code" href="/guides/composable">
+    A `useAuth()` composable gives every component and page direct access to
+    the auth instance, user data, and all authentication methods — fully
+    auto-imported.
+  </Card>
+  <Card title="Middleware" icon="lock" href="/guides/middleware">
+    A built-in route middleware lets you protect pages with a single
+    `definePageMeta` call, supporting authenticated, guest-only, and public
+    access modes.
+  </Card>
+  <Card title="SSR Support" icon="server" href="/guides/ssr">
+    Server-side rendering is supported via a Nitro token-reset endpoint and
+    seamless integration with `@nuxt-alt/proxy` for API proxying during SSR.
+  </Card>
+</CardGroup>
+
+## Relationship to @nuxtjs/auth
+
+`@nuxt-alt/auth` deliberately mirrors the options API of `@nuxtjs/auth` so that developers familiar with the original module can migrate quickly. Most option names, scheme configuration keys, and redirect properties carry over directly. The primary differences are the Nuxt 3 runtime requirements, the switch from Axios to `@nuxt-alt/http` (ofetch), the addition of Pinia and `useState` store backends, and the new OAuth2 client window feature. There is **no backwards compatibility with Nuxt 2** — this module targets `nuxt ^3.0.0` exclusively.
+
+## Dependencies
+
+| Package | Role |
+|---|---|
+| `@nuxt-alt/http` | HTTP client (extends `ofetch`). Auto-installed by the module. |
+| `pinia` | Optional reactive store backend for auth state. |
+| `jwt-decode` | Decodes JWT tokens for expiry validation. |
+| `cookie-es` | Cookie serialization and parsing for SSR-safe cookie storage. |
+
+## Get Started
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Add `@nuxt-alt/auth` and `@nuxt-alt/http` to your project and register the
+    module in `nuxt.config.ts`.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Configure a local strategy, build a login page, and protect your first
+    route in under five minutes.
+  </Card>
+</CardGroup>

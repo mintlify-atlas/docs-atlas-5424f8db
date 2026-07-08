@@ -1,0 +1,67 @@
+---
+title: "Auth0 Provider for @nuxt-alt/auth"
+sidebarTitle: "Auth0"
+description: "Configure the Auth0 provider in @nuxt-alt/auth to enable Auth0 OAuth2 authentication with authorization code flow, PKCE, and user info from the Auth0 API."
+---
+
+The Auth0 provider configures `@nuxt-alt/auth` to authenticate users through your Auth0 tenant. It uses the dedicated `auth0` scheme, which extends the OAuth2 scheme with Auth0-specific behaviour such as tenant-scoped endpoint resolution and support for the `audience` parameter required by Auth0 API authorization. All endpoint URLs are derived automatically from the `domain` you provide, so the only required options are your tenant domain and client ID.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `domain` | `string` | Your Auth0 tenant domain, e.g. `your-tenant.auth0.com` |
+| `clientId` | `string` | The Client ID of your Auth0 application |
+
+## Configuration
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      auth0: {
+        domain: 'your-tenant.auth0.com',
+        clientId: 'YOUR_CLIENT_ID',
+        // Optional: restrict access token audience to a specific API
+        audience: 'https://your-api.example.com',
+        // Optional: override the default scopes
+        scope: ['openid', 'profile', 'email'],
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+When the strategy name is `auth0`, the provider automatically sets the following values. Any property you specify in your own config takes precedence.
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'auth0'` |
+| `endpoints.authorization` | `https://{domain}/authorize` |
+| `endpoints.userInfo` | `https://{domain}/userinfo` |
+| `endpoints.token` | `https://{domain}/oauth/token` |
+| `endpoints.logout` | `https://{domain}/v2/logout` |
+| `scope` | `['openid', 'profile', 'email']` |
+| `token.property` | `'access_token'` |
+| `token.type` | `'Bearer'` |
+| `token.name` | `'Authorization'` |
+| `idToken.property` | `'id_token'` |
+| `refreshToken.property` | `'refresh_token'` |
+| `responseType` | `'token'` |
+
+## Logging In
+
+Once configured, trigger the Auth0 login redirect from any component or composable using the `loginWith` method:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('auth0')
+```
+
+The user will be redirected to the Auth0 Universal Login page. After successful authentication Auth0 redirects back to your application's callback route (default: `/login`), where `@nuxt-alt/auth` automatically exchanges the code for tokens and fetches the user profile from the `userinfo` endpoint.
+
+<Note>
+  You must add your application's callback URL to the **Allowed Callback URLs** list in the Auth0 dashboard under **Application Settings**. The default callback route used by `@nuxt-alt/auth` is `/login`. If you have customised `redirect.callback` in your auth config, use that path instead.
+</Note>

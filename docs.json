@@ -1,72 +1,80 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "@nuxt-alt/auth",
+  "theme": "luma",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
-  },
-  "favicon": "/favicon.svg",
-  "navigation": {
-    "pages": [
-      {
-        "group": "Getting Started",
-        "pages": [
-          "index",
-          "quickstart"
-        ]
-      }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
+    "primary": "#00DC82",
+    "light": "#ECFDF5",
+    "dark": "#003521"
   },
   "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
     "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://app.mintlify.com"
+      "type": "github",
+      "href": "https://github.com/nuxt-alt/auth"
     }
-  },
-  "contextual": {
-    "options": [
-      "copy",
-      "view",
-      "chatgpt",
-      "claude",
-      "perplexity",
-      "mcp",
-      "cursor",
-      "vscode"
-    ]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/nuxt-alt/auth"
     }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/module-options",
+              "configuration/storage",
+              "configuration/redirects"
+            ]
+          },
+          {
+            "group": "Schemes",
+            "pages": [
+              "schemes/local",
+              "schemes/refresh",
+              "schemes/cookie",
+              "schemes/oauth2",
+              "schemes/openid-connect"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "providers/overview",
+              "providers/auth0",
+              "providers/github",
+              "providers/google",
+              "providers/facebook",
+              "providers/discord",
+              "providers/laravel-sanctum",
+              "providers/laravel-passport",
+              "providers/laravel-jwt"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/middleware",
+              "guides/composable",
+              "guides/typescript",
+              "guides/ssr",
+              "guides/migration"
+            ]
+          }
+        ]
+      }
+    ]
   }
 }

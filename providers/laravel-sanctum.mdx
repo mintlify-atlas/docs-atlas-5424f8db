@@ -1,0 +1,85 @@
+---
+title: "Laravel Sanctum Provider for @nuxt-alt/auth"
+sidebarTitle: "Laravel Sanctum"
+description: "Configure @nuxt-alt/auth with Laravel Sanctum for session-based authentication using CSRF cookies, with optional SSR support via server-side requests."
+---
+
+The Laravel Sanctum provider configures `@nuxt-alt/auth` to authenticate users against a Laravel backend using Sanctum's SPA authentication — a cookie-based session flow protected by CSRF tokens. It uses the `cookie` scheme, which first fetches a CSRF cookie from Sanctum before sending the login request, then relies on the session cookie for all subsequent authenticated requests. All endpoint URLs are derived from the `url` you supply, which must point to the root of your Laravel application.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `url` | `string` | The base URL of your Laravel application, e.g. `http://localhost:8000` |
+
+## Configuration
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelSanctum: {
+        url: 'http://localhost:8000',
+        // Optional: enable SSR server-side auth handling
+        ssr: false,
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+When the strategy name is `laravelSanctum`, the provider automatically sets the following values based on the `url` you provide. All endpoint requests include `credentials: 'include'` so the browser sends and receives session cookies cross-origin.
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'cookie'` |
+| `cookie.name` | `'XSRF-TOKEN'` |
+| `endpoints.csrf.url` | `{url}/sanctum/csrf-cookie` |
+| `endpoints.csrf.credentials` | `'include'` |
+| `endpoints.login.url` | `{url}/login` |
+| `endpoints.login.credentials` | `'include'` |
+| `endpoints.refresh.url` | `{url}/refresh` |
+| `endpoints.refresh.credentials` | `'include'` |
+| `endpoints.logout.url` | `{url}/logout` |
+| `endpoints.logout.credentials` | `'include'` |
+| `endpoints.user.url` | `{url}/api/user` |
+| `endpoints.user.credentials` | `'include'` |
+| `user.property` | `false` |
+| `user.autoFetch` | `true` |
+| `token.type` | `'Bearer'` |
+
+## Logging In
+
+Pass the user's credentials in the request body using the `data` option:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('laravelSanctum', {
+  body: { email: 'user@example.com', password: 'password' },
+})
+```
+
+Before sending the login request, `@nuxt-alt/auth` automatically fetches `{url}/sanctum/csrf-cookie` to obtain the `XSRF-TOKEN` cookie. The token value is then forwarded as the `X-XSRF-TOKEN` request header on the login call, satisfying Sanctum's CSRF verification.
+
+## SSR Support
+
+When `ssr: true` is set in your strategy config, the provider calls `addLocalAuthorize` to register a Nuxt server route that handles authentication on the server side during SSR. This allows pages to render with a fully authenticated user on the first request rather than relying on a client-side rehydration step.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelSanctum: {
+        url: 'http://localhost:8000',
+        ssr: true,
+      },
+    },
+  },
+})
+```
+
+<Note>
+  Your Laravel application must be configured to allow cross-origin requests with credentials from your Nuxt app's origin. In `config/cors.php`, set `'supports_credentials' => true` and add your Nuxt origin to `allowed_origins`. Also ensure the `SESSION_DOMAIN` and `SANCTUM_STATEFUL_DOMAINS` environment variables include your Nuxt app's domain so Sanctum recognises the session as coming from a trusted SPA.
+</Note>

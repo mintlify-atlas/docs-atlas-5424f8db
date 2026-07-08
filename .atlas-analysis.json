@@ -1,0 +1,127 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "@nuxt-alt/auth",
+  "projectDescription": "A Nuxt 3 authentication module that provides pluggable strategies (local, cookie, OAuth2, OpenID Connect, refresh token) with SSR support, multiple storage backends, and a useAuth() composable.",
+  "theme": "luma",
+  "primaryColor": "#00DC82",
+  "lightColor": "#ECFDF5",
+  "darkColor": "#003521",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/module-options",
+              "configuration/storage",
+              "configuration/redirects"
+            ]
+          },
+          {
+            "group": "Schemes",
+            "pages": [
+              "schemes/local",
+              "schemes/refresh",
+              "schemes/cookie",
+              "schemes/oauth2",
+              "schemes/openid-connect"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "providers/overview",
+              "providers/auth0",
+              "providers/github",
+              "providers/google",
+              "providers/facebook",
+              "providers/discord",
+              "providers/laravel-sanctum",
+              "providers/laravel-passport",
+              "providers/laravel-jwt"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/middleware",
+              "guides/composable",
+              "guides/typescript",
+              "guides/ssr",
+              "guides/migration"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Nuxt 3 native authentication module (Nuxt 3 only, no legacy support)",
+    "Multiple built-in schemes: local token, cookie, refresh token, OAuth2, OpenID Connect, Auth0",
+    "Eight pre-configured providers: Auth0, GitHub, Google, Facebook, Discord, Laravel Sanctum, Laravel Passport, Laravel JWT",
+    "SSR-aware storage using cookies, localStorage, sessionStorage, Pinia, or Nuxt useState",
+    "useAuth() composable for accessing $auth in components and composables",
+    "Automatic route middleware with per-page auth meta support (auth: false, auth: 'guest')",
+    "Token validation interval with automatic refresh on expiry",
+    "OAuth2 client window (popup) authentication support",
+    "PKCE code challenge support for OAuth2/OpenID Connect",
+    "i18n locale-aware redirect paths via @nuxtjs/i18n integration",
+    "resetOnError and resetOnResponseError hooks for custom error handling",
+    "TypeScript-first with full type augmentation for NuxtApp, RouteMeta, and NuxtConfig"
+  ],
+  "publicApiSurface": [
+    "useAuth() — composable returning the $auth instance",
+    "$auth.login(...args) — trigger login on the active strategy",
+    "$auth.loginWith(name, ...args) — switch strategy then login",
+    "$auth.logout(...args) — trigger logout on the active strategy",
+    "$auth.fetchUser(...args) — fetch/refresh the user object",
+    "$auth.setUser(user) — manually set the authenticated user",
+    "$auth.setUserToken(token, refreshToken?) — manually set tokens and fetch user",
+    "$auth.reset(...args) — reset authentication state",
+    "$auth.refreshTokens() — trigger token refresh",
+    "$auth.check(checkStatus?) — validate current token/scheme status",
+    "$auth.redirect(name, route?, router?) — perform an auth redirect",
+    "$auth.setStrategy(name) — switch to a named strategy",
+    "$auth.registerStrategy(name, strategy) — register a custom strategy",
+    "$auth.onError(listener) — register an error listener",
+    "$auth.onRedirect(listener) — intercept redirect calls",
+    "$auth.hasScope(scope) — check if user has a given scope",
+    "$auth.request(endpoint, defaults?) — make an authenticated HTTP request",
+    "$auth.requestWith(endpoint?, defaults?) — make a request with token header injected",
+    "$auth.loggedIn — boolean reactive logged-in state",
+    "$auth.user — reactive user object",
+    "$auth.strategy — active Scheme instance",
+    "$auth.tokenStrategy — active scheme cast as TokenableScheme",
+    "$auth.refreshStrategy — active scheme cast as RefreshableScheme",
+    "$auth.$storage — Storage instance (cookie/local/session/state management)",
+    "LocalScheme — base token scheme class",
+    "RefreshScheme — extends LocalScheme with refresh token support",
+    "CookieScheme — cookie-based session scheme",
+    "Oauth2Scheme — full OAuth2 / Authorization Code / Implicit flow scheme",
+    "OpenIDConnectScheme — extends Oauth2Scheme with ID token and OIDC discovery",
+    "auth0() — Auth0 provider factory",
+    "github() — GitHub OAuth2 provider factory",
+    "google() — Google OAuth2 provider factory",
+    "facebook() — Facebook OAuth2 provider factory",
+    "discord() — Discord OAuth2 provider factory",
+    "laravelSanctum() — Laravel Sanctum cookie provider factory",
+    "laravelPassport() — Laravel Passport OAuth2 provider factory",
+    "laravelJWT() — Laravel JWT local scheme provider factory",
+    "#auth/runtime — runtime alias for scheme/token/storage classes",
+    "#auth/providers — providers alias",
+    "#auth/utils — utilities alias",
+    "UserInfo interface — extendable via declaration merging",
+    "ModuleOptions — full module configuration type",
+    "RouteMeta.auth — 'guest' | false per-page auth meta"
+  ]
+}

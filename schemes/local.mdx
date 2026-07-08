@@ -1,0 +1,215 @@
+---
+title: "Local Scheme: Token-Based Authentication for Nuxt 3"
+sidebarTitle: "Local"
+description: "Configure the local scheme in @nuxt-alt/auth for username/password login with JWT or bearer tokens, including token storage, expiry, and user fetch settings."
+---
+
+The `local` scheme is the foundational token-based strategy in `@nuxt-alt/auth`. It posts credentials to a login endpoint, stores the returned token in local storage or cookies, attaches it automatically to outgoing requests via a configurable header, and then fetches the authenticated user's profile from a dedicated user endpoint. Most custom backends that issue JWTs or opaque bearer tokens are a natural fit for this scheme.
+
+## Configuration
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      local: {
+        token: {
+          property: 'token',              // path in the login response to the token
+          type: 'Bearer',                 // token type prefix
+          name: 'Authorization',          // header name
+          maxAge: false,                  // false = use expiresProperty from response
+          expiresProperty: 'expires_in',
+          global: true,
+          required: true,
+          prefix: '_token.',
+          expirationPrefix: '_token_expiration.',
+        },
+        endpoints: {
+          login:  { url: '/api/auth/login',   method: 'post' },
+          logout: { url: '/api/auth/logout',  method: 'post' },
+          user:   { url: '/api/auth/user',    method: 'get'  },
+        },
+        user: {
+          property: 'user',   // path in the user response
+          autoFetch: true,
+        },
+      },
+    },
+  },
+})
+```
+
+---
+
+## Endpoints
+
+<ParamField body="endpoints.login" type="HTTPRequest | false" required>
+  The login endpoint. The scheme sends the user-supplied credentials to this URL and extracts the token from the response.
+
+  **Default:** `{ url: '/api/auth/login', method: 'post' }`
+</ParamField>
+
+<ParamField body="endpoints.logout" type="HTTPRequest | false">
+  The logout endpoint. When set to `false`, no HTTP request is made on logout — the scheme only clears local state.
+
+  **Default:** `{ url: '/api/auth/logout', method: 'post' }`
+</ParamField>
+
+<ParamField body="endpoints.user" type="HTTPRequest | false">
+  The user info endpoint. When set to `false`, the scheme skips the user fetch entirely; you can call `auth.setUser()` manually to populate the user object.
+
+  **Default:** `{ url: '/api/auth/user', method: 'get' }`
+</ParamField>
+
+---
+
+## Token
+
+<ParamField body="token.property" type="string">
+  The dot-notation path inside the login response body where the token value lives. For example, `'data.access_token'` will traverse `response.data.access_token`.
+
+  **Default:** `'token'`
+</ParamField>
+
+<ParamField body="token.expiresProperty" type="string">
+  The dot-notation path in the login response for the token's lifetime in seconds. Used when `token.maxAge` is `false`.
+
+  **Default:** `'expires_in'`
+</ParamField>
+
+<ParamField body="token.type" type="string | false">
+  The prefix prepended to the token value when setting the authorization header (e.g. `'Bearer mytoken123'`). Set to `false` to send the raw token without a prefix.
+
+  **Default:** `'Bearer'`
+</ParamField>
+
+<ParamField body="token.name" type="string">
+  The HTTP request header used to carry the token.
+
+  **Default:** `'Authorization'`
+</ParamField>
+
+<ParamField body="token.maxAge" type="number | false">
+  Override the token lifetime in seconds, ignoring any value returned by the server. When `false`, the scheme reads `token.expiresProperty` from the login response instead.
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="token.global" type="boolean">
+  When `true`, the token is automatically attached to every outgoing HTTP request via the request interceptor.
+
+  **Default:** `true`
+</ParamField>
+
+<ParamField body="token.required" type="boolean">
+  When `true`, the scheme treats the absence of a valid token as an unauthenticated state. Set to `false` for cookie-only flows where a token is optional.
+
+  **Default:** `true`
+</ParamField>
+
+<ParamField body="token.prefix" type="string">
+  The key prefix used when persisting the token in storage.
+
+  **Default:** `'_token.'`
+</ParamField>
+
+<ParamField body="token.expirationPrefix" type="string">
+  The key prefix used when persisting the token expiration timestamp in storage.
+
+  **Default:** `'_token_expiration.'`
+</ParamField>
+
+---
+
+## User
+
+<ParamField body="user.property" type="string | false">
+  The dot-notation path within the user endpoint response that contains the user object. Set to `false` if the entire response body is the user object.
+
+  **Default:** `'user'`
+</ParamField>
+
+<ParamField body="user.autoFetch" type="boolean">
+  When `true`, the scheme automatically calls the user endpoint immediately after a successful login.
+
+  **Default:** `true`
+</ParamField>
+
+---
+
+## Additional Options
+
+<ParamField body="clientId" type="string">
+  When set, the value is included as `client_id` in the login request body. Useful for OAuth2-compatible password-grant backends.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="grantType" type="string">
+  When set, the value is included as `grant_type` in the login request body. Accepts any of the standard OAuth2 grant type strings (e.g. `'password'`).
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="scope" type="string | string[]">
+  When set, the value is included as `scope` in the login request body. May be a space-delimited string or an array of scope names.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="ssr" type="boolean">
+  When `true`, sets `baseURL` to an empty string on login requests so that they are resolved relative to the server's origin during SSR. Useful when your API and Nuxt app share the same host.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## Usage
+
+### Login and logout in a component
+
+```vue
+<script setup lang="ts">
+const auth = useAuth()
+
+async function login() {
+  await auth.loginWith('local', {
+    body: {
+      email: 'user@example.com',
+      password: 'password',
+    },
+  })
+}
+
+async function logout() {
+  await auth.logout()
+}
+</script>
+```
+
+### Setting a token manually
+
+If you already have a token from a server-side exchange, you can inject it directly and trigger a user fetch:
+
+```ts
+const auth = useAuth()
+await auth.setUserToken('my-jwt-token')
+```
+
+---
+
+## Disabling Endpoints
+
+Both `logout` and `user` endpoints accept `false` to opt out of the corresponding HTTP call:
+
+```ts
+endpoints: {
+  logout: false, // clears local state only; no API call is made
+  user:   false, // skips automatic user fetch; call auth.setUser() manually
+}
+```
+
+<Note>
+  When `endpoints.user` is `false`, the scheme sets the user object to an empty object `{}` after login. Call `auth.setUser(myUserData)` at any point to populate it with the data you have.
+</Note>

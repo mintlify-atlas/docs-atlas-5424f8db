@@ -1,0 +1,155 @@
+---
+title: "Cookie Scheme: Session-Based Auth with CSRF Support"
+sidebarTitle: "Cookie"
+description: "Configure the cookie scheme in @nuxt-alt/auth for session-based authentication with optional CSRF protection, ideal for Laravel Sanctum and similar backends."
+---
+
+The `cookie` scheme extends `LocalScheme` for backends that manage authentication state through session cookies rather than returning a token in the response body. Instead of reading a token from the login response, the scheme relies on the browser cookie jar to maintain the session. It optionally issues a CSRF preflight request before login — making it a natural fit for backends like Laravel Sanctum, Django's session auth, or any server that sets a session cookie on successful login.
+
+## Configuration
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelSanctum: {
+        scheme: 'cookie',
+        cookie: {
+          name: 'XSRF-TOKEN', // name of the session cookie to check for authentication
+        },
+        endpoints: {
+          csrf:   { url: '/sanctum/csrf-cookie', credentials: 'include' },
+          login:  { url: '/login',               credentials: 'include' },
+          logout: { url: '/logout',              credentials: 'include' },
+          user:   { url: '/api/user',            credentials: 'include' },
+        },
+        user: {
+          property: false,
+          autoFetch: true,
+        },
+        token: {
+          type: false,      // no bearer token
+          required: false,
+        },
+      },
+    },
+  },
+})
+```
+
+---
+
+## Cookie Options
+
+<ParamField body="cookie.name" type="string">
+  The name of the browser cookie used to determine whether the user has an active session. When set, the scheme inspects `document.cookie` (or the server-side cookie store during SSR) for a cookie with this name before treating the session as valid. When `undefined`, the scheme skips the cookie check and considers any successful login as authenticated.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## Endpoints
+
+<ParamField body="endpoints.csrf" type="HTTPRequest | false">
+  A request made before the login call to obtain a CSRF token. The backend typically sets an `XSRF-TOKEN` cookie in this response which the HTTP client then reads and attaches as a header on subsequent mutating requests. Set to `false` to skip the CSRF preflight entirely.
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="endpoints.login" type="HTTPRequest | false">
+  The login endpoint. After an optional CSRF request, credentials are posted here. Inherited from `LocalScheme`.
+
+  **Default:** `{ url: '/api/auth/login', method: 'post' }`
+</ParamField>
+
+<ParamField body="endpoints.logout" type="HTTPRequest | false">
+  The logout endpoint. Set to `false` to clear local state only without calling the server. Inherited from `LocalScheme`.
+
+  **Default:** `{ url: '/api/auth/logout', method: 'post' }`
+</ParamField>
+
+<ParamField body="endpoints.user" type="HTTPRequest | false">
+  The user info endpoint. Set to `false` to skip the user fetch. Inherited from `LocalScheme`.
+
+  **Default:** `{ url: '/api/auth/user', method: 'get' }`
+</ParamField>
+
+<ParamField body="url" type="string">
+  An optional base URL override for all scheme endpoints. Useful when your session API lives on a different origin from the Nuxt app.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## Token Options (Defaults for Cookie Scheme)
+
+The cookie scheme ships with the token system disabled by default so that purely session-based backends work out of the box:
+
+| Option             | Default  |
+|--------------------|----------|
+| `token.type`       | `false`  |
+| `token.property`   | `''`     |
+| `token.maxAge`     | `false`  |
+| `token.global`     | `false`  |
+| `token.required`   | `false`  |
+
+If your backend returns a token alongside the session cookie you can re-enable token mode:
+
+```ts
+token: {
+  type: 'Bearer',  // re-enable token mode
+  property: 'token',
+  required: true,
+}
+```
+
+When `token.type` is truthy, the cookie scheme delegates to the full `LocalScheme` token lifecycle — storing the token, attaching it to requests, and respecting expiry.
+
+---
+
+## User Options (Defaults for Cookie Scheme)
+
+| Option              | Default  |
+|---------------------|----------|
+| `user.property`     | `false`  |
+| `user.autoFetch`    | `true`   |
+
+Setting `user.property` to `false` means the entire user endpoint response body is treated as the user object, which matches frameworks like Laravel where `/api/user` returns the user directly.
+
+---
+
+## Usage
+
+### Login with session cookies
+
+```vue
+<script setup lang="ts">
+const auth = useAuth()
+
+async function login() {
+  await auth.loginWith('laravelSanctum', {
+    body: {
+      email: 'user@example.com',
+      password: 'password',
+    },
+  })
+}
+</script>
+```
+
+### Manually setting the user after login
+
+When `endpoints.user` is set to `false`, populate the user object yourself:
+
+```ts
+const auth = useAuth()
+auth.setUser({ id: 1, name: 'Alice', email: 'alice@example.com' })
+```
+
+---
+
+<Note>
+  The `laravelSanctum` provider pre-configures the cookie scheme with sensible defaults for Laravel Sanctum, including the CSRF endpoint and cookie name. See the [Laravel Sanctum provider](/providers/laravel-sanctum) page for a ready-to-use setup.
+</Note>

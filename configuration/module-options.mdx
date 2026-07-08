@@ -1,0 +1,217 @@
+---
+title: "Module Options Reference for @nuxt-alt/auth"
+sidebarTitle: "Module Options"
+description: "Complete reference for all @nuxt-alt/auth configuration options, including middleware, error handling, token validation, redirect strategy, and store settings."
+---
+
+This page documents every top-level option accepted by the `auth` key in your `nuxt.config.ts`. Options control the built-in middleware, error-handling behavior, token validation, redirect logic, storage backends, and the authentication strategies themselves. All options are optional and fall back to the defaults listed below.
+
+---
+
+## Middleware
+
+<ParamField body="globalMiddleware" type="Boolean" default="false">
+  When `true`, the auth middleware is applied globally to every route in your application. Individual pages can still opt out using `definePageMeta({ auth: false })`. This option is ignored if `enableMiddleware` is `false`.
+</ParamField>
+
+<ParamField body="enableMiddleware" type="Boolean" default="true">
+  Master switch for the built-in auth middleware. Setting this to `false` disables all automatic route protection, including global middleware.
+</ParamField>
+
+---
+
+## Error Handling
+
+<ParamField body="resetOnError" type="Boolean | Function" default="false">
+  When `true`, the auth state is automatically reset whenever an error is emitted through `$auth.onError`. You can also supply a function `(...args) => boolean` — the reset only happens if the function returns `true`, allowing you to filter which errors trigger a reset.
+</ParamField>
+
+<ParamField body="resetOnResponseError" type="Boolean | Function" default="false">
+  When `true`, the auth state is reset whenever any HTTP response returns a `401 Unauthorized` status. You can replace the boolean with a callback `(error, auth, scheme) => void` to handle the error yourself:
+
+  ```ts
+  auth: {
+    resetOnResponseError: (error, auth, scheme) => {
+      if (error.response.status === 401) {
+        scheme.reset?.()
+        auth.redirect('login')
+      }
+    },
+  }
+  ```
+</ParamField>
+
+<ParamField body="ignoreExceptions" type="Boolean" default="false">
+  When `true`, any exceptions thrown by the storage layer (for example, if `localStorage` is unavailable) are silently swallowed instead of being re-thrown. Useful when you need graceful degradation in restricted browser environments.
+</ParamField>
+
+---
+
+## Token & Session
+
+<ParamField body="tokenValidationInterval" type="Boolean | Number" default="false">
+  Enables periodic client-side token expiry checks. Set to `true` to use the default interval of `1000 ms`, or provide a number of milliseconds for a custom interval. When a token is found to be expired and cannot be refreshed, an `ExpiredAuthSessionError` is thrown and the session is reset.
+
+  <Warning>
+    This feature is experimental. Avoid very short intervals in production to prevent excessive network activity.
+  </Warning>
+</ParamField>
+
+<ParamField body="scopeKey" type="String" default="'scope'">
+  The property path on the authenticated user object that holds the user's scopes. Used by `$auth.hasScope(scope)` to check whether the current user possesses a particular permission.
+</ParamField>
+
+<ParamField body="watchLoggedIn" type="Boolean" default="true">
+  When `true`, a Vue watcher monitors the reactive `loggedIn` state. If it changes (for example, the token expires client-side), the user is automatically redirected to the `home` or `logout` redirect path depending on the new state.
+</ParamField>
+
+---
+
+## Strategies
+
+<ParamField body="strategies" type="Record<string, StrategyOptions>" default="{}">
+  A map of named strategy configurations. Each key becomes the strategy name used with `$auth.loginWith('strategyName')`. The value is a strategy-specific options object (e.g. `local`, `oauth2`, `refresh`). See the individual strategy pages for the full option set for each type.
+</ParamField>
+
+<ParamField body="defaultStrategy" type="String" default="undefined">
+  The name of the strategy that is activated on application initialization. If left unset, the module automatically uses the first key defined in `strategies`. You rarely need to set this manually.
+</ParamField>
+
+---
+
+## Stores
+
+The `stores` object controls how and where auth state is persisted. See [Storage](/configuration/storage) for a full explanation of each backend and its trade-offs.
+
+<ParamField body="stores.state.namespace" type="String" default="'auth'">
+  The key used when calling Nuxt's `useState()` to create the reactive auth state. Change this if `'auth'` conflicts with another `useState` key in your application.
+</ParamField>
+
+<ParamField body="stores.pinia.enabled" type="Boolean" default="false">
+  Set to `true` to use a Pinia store for reactive auth state instead of Nuxt's `useState`. Requires `@pinia/nuxt` to be installed and added to `modules`.
+</ParamField>
+
+<ParamField body="stores.pinia.namespace" type="String" default="'auth'">
+  The Pinia store ID used when `stores.pinia.enabled` is `true`.
+</ParamField>
+
+<ParamField body="stores.cookie.enabled" type="Boolean" default="true">
+  Enables cookie-based persistence. Cookies are the recommended default because they are sent with every HTTP request, making tokens available server-side during SSR.
+</ParamField>
+
+<ParamField body="stores.cookie.prefix" type="String" default="'auth.'">
+  String prepended to every cookie name written by the auth module (e.g. `auth.token`, `auth.strategy`).
+</ParamField>
+
+<ParamField body="stores.cookie.options" type="Object" default='{ path: "/", sameSite: "lax", maxAge: 31536000 }'>
+  Passed directly to `cookie-es` when serializing cookies. Accepts any [`CookieSerializeOptions`](https://github.com/unjs/cookie-es) field such as `path`, `sameSite`, `maxAge`, `domain`, `secure`, and `httpOnly`. In production the `secure` flag is automatically applied.
+</ParamField>
+
+<ParamField body="stores.local.enabled" type="Boolean" default="false">
+  Enables `localStorage` as an additional persistence backend. Browser-only — has no effect during SSR.
+</ParamField>
+
+<ParamField body="stores.local.prefix" type="String" default="'auth.'">
+  String prepended to every `localStorage` key written by the auth module.
+</ParamField>
+
+<ParamField body="stores.session.enabled" type="Boolean" default="false">
+  Enables `sessionStorage` as an additional persistence backend. Values are cleared when the browser tab is closed. Browser-only — has no effect during SSR.
+</ParamField>
+
+<ParamField body="stores.session.prefix" type="String" default="'auth.'">
+  String prepended to every `sessionStorage` key written by the auth module.
+</ParamField>
+
+---
+
+## Redirects
+
+The `redirect` object and related options govern where users are sent at various points in the auth lifecycle. See [Redirects](/configuration/redirects) for a detailed explanation of each redirect path and the available strategies.
+
+<ParamField body="redirect.login" type="String | Function" default="'/login'">
+  The path unauthenticated users are redirected to when they try to access a protected route.
+</ParamField>
+
+<ParamField body="redirect.logout" type="String | Function" default="'/'">
+  The path users land on after a successful logout.
+</ParamField>
+
+<ParamField body="redirect.home" type="String | Function" default="'/'">
+  The path users land on after a successful login. When `rewriteRedirects` is `true` this is overridden by the stored pre-login URL.
+</ParamField>
+
+<ParamField body="redirect.callback" type="String | Function" default="'/login'">
+  The OAuth2 callback path. The module expects the strategy to handle the token exchange at this URL.
+</ParamField>
+
+<ParamField body="rewriteRedirects" type="Boolean" default="true">
+  When `true`, the URL the user was trying to reach before being sent to the login page is saved and restored after a successful login. Disable this to always redirect to `redirect.home`.
+</ParamField>
+
+<ParamField body="fullPathRedirect" type="Boolean" default="false">
+  When `true`, the full path including query parameters is used when storing and restoring the pre-login URL instead of just the pathname.
+</ParamField>
+
+<ParamField body="redirectStrategy" type="'query' | 'storage'" default="'storage'">
+  Determines how the pre-login URL is preserved. `'storage'` saves it to the enabled storage backends (cookie/localStorage). `'query'` appends it as a `?to=<url>` query parameter on the login URL.
+</ParamField>
+
+---
+
+## Plugin Extensions
+
+<ParamField body="plugins" type="Array<NuxtPlugin | string>">
+  An array of additional Nuxt plugin file paths (or plugin objects) to register alongside the auth module's own plugin. Use this to extend or hook into auth behavior with your own composables or global setup logic. Accepts the same values as the `plugins` array in `nuxt.config.ts`.
+</ParamField>
+
+---
+
+## Full Configuration Example
+
+The following `nuxt.config.ts` shows all commonly used options together:
+
+```ts
+export default defineNuxtConfig({
+  modules: ['@nuxt-alt/auth'],
+  auth: {
+    globalMiddleware: false,
+    enableMiddleware: true,
+    resetOnError: false,
+    resetOnResponseError: false,
+    ignoreExceptions: false,
+    scopeKey: 'scope',
+    watchLoggedIn: true,
+    tokenValidationInterval: false,
+    redirectStrategy: 'storage',
+    rewriteRedirects: true,
+    fullPathRedirect: false,
+    redirect: {
+      login: '/login',
+      logout: '/',
+      home: '/',
+      callback: '/login',
+    },
+    stores: {
+      state: { namespace: 'auth' },
+      pinia: { enabled: false, namespace: 'auth' },
+      cookie: {
+        enabled: true,
+        prefix: 'auth.',
+        options: {
+          path: '/',
+          sameSite: 'lax',
+          maxAge: 31536000,
+        },
+      },
+      local: { enabled: false, prefix: 'auth.' },
+      session: { enabled: false, prefix: 'auth.' },
+    },
+    strategies: {
+      local: {
+        // strategy config
+      },
+    },
+  },
+})
+```

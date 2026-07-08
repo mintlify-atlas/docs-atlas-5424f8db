@@ -1,0 +1,124 @@
+---
+title: "Configure Authentication Redirect Behavior"
+sidebarTitle: "Redirects"
+description: "Configure login, logout, home, and callback redirect paths in @nuxt-alt/auth, and choose between query-string and storage-based redirect strategies."
+---
+
+Authentication flows are inherently redirect-heavy: unauthenticated users must be sent to a login page, successful logins must return users to where they were going, and logouts need a safe landing page. `@nuxt-alt/auth` gives you precise control over every redirect in the flow — both the destination paths and the strategy used to preserve the user's original URL across the login round-trip.
+
+---
+
+## Redirect Paths
+
+The `redirect` object in your module config maps named redirect events to URL paths. Every value accepts either a plain string or a function that receives the `$auth` instance and an optional locale path transformer.
+
+<ParamField body="redirect.login" type="String | Function" default="'/login'">
+  The path unauthenticated users are redirected to when they attempt to access a protected route. This is also the destination when `$auth.redirect('login')` is called programmatically.
+</ParamField>
+
+<ParamField body="redirect.logout" type="String | Function" default="'/'">
+  The path users land on immediately after a successful logout. Called by `$auth.redirect('logout')` at the end of the logout lifecycle.
+</ParamField>
+
+<ParamField body="redirect.home" type="String | Function" default="'/'">
+  The default destination after a successful login. When `rewriteRedirects` is `true`, this is overridden by the pre-login URL that was saved before the user was sent to the login page.
+</ParamField>
+
+<ParamField body="redirect.callback" type="String | Function" default="'/login'">
+  The URL the OAuth2 provider redirects back to after the user authorizes your application. The active OAuth2 strategy listens at this path to exchange the authorization code for tokens.
+</ParamField>
+
+All four values accept a function signature `(auth: Auth, trans?: Function) => string`. The `trans` argument is the `$localePath` function from `@nuxtjs/i18n` when that module is installed, allowing locale-aware redirect paths:
+
+```ts
+auth: {
+  redirect: {
+    login: (auth, localePath) => localePath?.('/login') ?? '/login',
+    logout: '/',
+    home: '/',
+    callback: '/login',
+  },
+}
+```
+
+---
+
+## Redirect Strategy
+
+The `redirectStrategy` option determines how the user's original URL is preserved across the login redirect so it can be restored after a successful login.
+
+<ParamField body="redirectStrategy" type="'query' | 'storage'" default="'storage'">
+  Choose how the pre-login destination is stored:
+
+  - **`'storage'`** — The original URL is saved to the enabled storage backends (cookie and/or localStorage) under the key `redirect`. After login the stored URL is read, the storage entry is cleared, and the user is pushed to that path.
+  - **`'query'`** — The original URL is appended as a `?to=<encoded-url>` query parameter on the login page URL (e.g. `/login?to=%2Fdashboard`). After login the `to` parameter is read from the route query and used as the destination.
+
+  ```ts
+  auth: {
+    redirectStrategy: 'storage', // or 'query'
+  }
+  ```
+</ParamField>
+
+<Tip>
+  Use `'storage'` (the default) when you want to keep login page URLs clean. Use `'query'` when you need the redirect destination to be visible and shareable in the URL bar, or when localStorage is unavailable.
+</Tip>
+
+---
+
+## Related Options
+
+<ParamField body="rewriteRedirects" type="Boolean" default="true">
+  When `true`, the module saves the page the user was trying to reach before the login redirect and restores it after a successful login. When `false`, users are always sent to `redirect.home` after login, regardless of where they came from.
+</ParamField>
+
+<ParamField body="fullPathRedirect" type="Boolean" default="false">
+  When `true`, the full path including query parameters (`route.fullPath`) is used when storing and restoring the pre-login URL instead of just the pathname (`route.path`). Enable this when your application uses query parameters as meaningful page state that should survive the login round-trip.
+</ParamField>
+
+---
+
+## Per-page Auth Meta
+
+The middleware reads `definePageMeta({ auth })` on each route to decide whether and how to enforce authentication. You have three options per page:
+
+```vue
+<script setup lang="ts">
+// Require authentication — unauthenticated users are redirected to redirect.login
+definePageMeta({ auth: true })
+
+// Guest-only page — logged-in users are redirected to redirect.home
+definePageMeta({ auth: 'guest' })
+
+// Disable auth checks entirely for this page
+definePageMeta({ auth: false })
+</script>
+```
+
+<Note>
+  When `globalMiddleware` is `false` (the default), pages without a `definePageMeta({ auth })` declaration are **not** protected. When `globalMiddleware` is `true`, all pages are protected unless you explicitly opt out with `auth: false`.
+</Note>
+
+---
+
+## i18n Integration
+
+If `@nuxtjs/i18n` is installed in your project, `@nuxt-alt/auth` automatically integrates with it in two ways:
+
+1. **Startup transform** — On initialization, every string-valued redirect path is passed through `$localePath()` so it resolves to the correct locale-prefixed URL for the active locale.
+2. **Locale switch** — The module hooks into the `i18n:localeSwitched` event. Whenever the active locale changes, all redirect paths are re-transformed through `$localePath()` to match the new locale.
+
+This means you can safely use locale-agnostic paths like `'/login'` in your config and they will automatically resolve to `/en/login`, `/fr/login`, etc. at runtime. For more control you can use the function form to call `localePath` directly:
+
+```ts
+auth: {
+  redirect: {
+    login: (auth, localePath) => localePath?.('/login') ?? '/login',
+    logout: (auth, localePath) => localePath?.('/') ?? '/',
+    home: (auth, localePath) => localePath?.('/') ?? '/',
+    callback: (auth, localePath) => localePath?.('/login') ?? '/login',
+  },
+}
+```
+
+The `trans` argument passed to each function is the bound `$localePath` function from the current Nuxt app context, or `undefined` if `@nuxtjs/i18n` is not present — so the `?? fallback` pattern shown above is the recommended defensive style.

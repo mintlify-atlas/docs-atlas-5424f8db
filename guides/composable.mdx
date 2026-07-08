@@ -1,0 +1,221 @@
+---
+title: "useAuth() Composable: Access Auth State and Methods"
+sidebarTitle: "Composable"
+description: "Use the useAuth() composable to access login, logout, user state, token management, and strategy switching from any Nuxt 3 component or composable."
+---
+
+`useAuth()` is auto-imported by the module and returns the `$auth` instance that is injected into every Nuxt app. It gives you access to the full authentication API — reactive state, login and logout methods, token management, strategy switching, and event listeners — from any component, composable, or plugin without any manual imports.
+
+<Note>
+  `useAuth()` is a convenience wrapper around `useNuxtApp().$auth`. Both expressions return the same `Auth` instance, so you can use whichever style fits your codebase.
+
+  ```ts
+  const auth = useAuth()
+  // identical to:
+  const { $auth: auth } = useNuxtApp()
+  ```
+</Note>
+
+## Reactive State
+
+The `Auth` instance exposes several reactive properties that update automatically as authentication state changes. You can use them directly in templates or watch them with `watchEffect`.
+
+```ts
+const auth = useAuth()
+
+// true when the user has a valid session
+console.log(auth.loggedIn) // boolean
+
+// the authenticated user object (undefined when logged out)
+console.log(auth.user) // UserInfo | undefined
+
+// the name of the currently active strategy
+console.log(auth.$state.strategy) // string | undefined
+
+// true while a login, logout, or fetchUser operation is in progress
+console.log(auth.busy) // boolean
+```
+
+## Authentication Methods
+
+### login()
+
+Calls the active strategy's `login()` method directly. Use this when you have already set the strategy and just want to pass credentials.
+
+```ts
+await auth.login({ body: { email, password } })
+```
+
+### loginWith()
+
+Switches to a named strategy and immediately calls `login()`. This is the most common entry point for user authentication.
+
+```ts
+// Log in with the local strategy
+await auth.loginWith('local', { body: { email, password } })
+
+// Log in with OAuth2 — redirects to the provider's authorization URL
+await auth.loginWith('github')
+```
+
+### logout()
+
+Calls the active strategy's `logout()` method. If the strategy does not define a logout endpoint, `auth.reset()` is called automatically.
+
+```ts
+await auth.logout()
+```
+
+### fetchUser()
+
+Re-fetches the current user from the strategy's user endpoint and updates `auth.user`. Useful after updating profile data server-side.
+
+```ts
+await auth.fetchUser()
+```
+
+### setUser()
+
+Manually sets or clears the user object in the auth state. When `false` is passed, the user is cleared and `loggedIn` is set to `false`.
+
+```ts
+auth.setUser({ id: 1, name: 'Alice' }) // set user directly
+auth.setUser(false)                      // clear user and set loggedIn = false
+```
+
+### setUserToken()
+
+Sets the access token (and optionally a refresh token) on the current token strategy and triggers a user fetch. This is useful after receiving tokens from a custom flow outside the standard `login()` method.
+
+```ts
+await auth.setUserToken('access_token_value', 'refresh_token_value')
+```
+
+### reset()
+
+Clears all stored tokens, the user object, and resets the `loggedIn` state. Unlike `logout()`, `reset()` does **not** call any server endpoint and does **not** redirect the user.
+
+```ts
+auth.reset() // clears tokens and user; does NOT redirect
+```
+
+### refreshTokens()
+
+Manually triggers the refresh token flow via the active strategy's `refreshController`. This is normally called automatically by the middleware, but you can invoke it directly if needed.
+
+```ts
+await auth.refreshTokens()
+```
+
+### check()
+
+Runs the active strategy's `check()` method and returns a `SchemeCheck` object describing the current token validity. Pass `true` to also check for expiry.
+
+```ts
+const { valid, tokenExpired, refreshTokenExpired, isRefreshable } = auth.check(true)
+```
+
+The returned object has the following shape:
+
+```ts
+interface SchemeCheck {
+  valid: boolean
+  tokenExpired?: boolean
+  refreshTokenExpired?: boolean
+  idTokenExpired?: boolean
+  isRefreshable?: boolean
+}
+```
+
+### redirect()
+
+Redirects the user to one of the configured redirect paths. Accepts an optional route argument to use as the `from` path for rewrite logic.
+
+```ts
+auth.redirect('login')  // → options.redirect.login
+auth.redirect('home')   // → options.redirect.home
+auth.redirect('logout') // → options.redirect.logout
+```
+
+### setStrategy()
+
+Resets the current strategy, stores the new strategy name, and calls `mounted()` on the new strategy. The returned promise resolves when the strategy is fully initialized.
+
+```ts
+await auth.setStrategy('github')
+```
+
+### hasScope()
+
+Checks whether the current user has a given scope. Looks up the property defined by `options.scopeKey` on the user object, and supports both array-based and nested object-based scope representations.
+
+```ts
+auth.hasScope('admin')     // returns boolean
+auth.hasScope('read:posts') // returns boolean
+```
+
+### request() and requestWith()
+
+Low-level methods for making authenticated HTTP requests via `@nuxt-alt/http`. `requestWith()` automatically reads the current token from the active strategy and attaches it to the request headers.
+
+```ts
+// requestWith attaches the Authorization header automatically
+const response = await auth.requestWith({
+  url: '/api/data',
+  method: 'get',
+})
+
+// request sends the raw request without token injection
+const response = await auth.request({
+  url: '/api/public',
+  method: 'get',
+})
+```
+
+## Event Listeners
+
+### onError()
+
+Registers a callback that fires whenever an auth error occurs (e.g. a failed login or a refresh error). All registered listeners are called with the error and a payload describing which method triggered it.
+
+```ts
+auth.onError((error, payload) => {
+  console.error('Auth error:', error, payload)
+})
+```
+
+### onRedirect()
+
+Registers a callback that runs before every auth redirect. The callback receives the destination (`to`) and origin (`from`) strings and can return a modified destination to override the redirect target.
+
+```ts
+auth.onRedirect((to, from) => {
+  console.log(`Redirecting from ${from} to ${to}`)
+  // Return a modified destination or the original to proceed
+  return to
+})
+```
+
+## Strategy Getters
+
+The `Auth` class exposes three typed getters that all return the same active strategy instance. The difference is purely the TypeScript return type, which enables type-safe access to token and refresh-specific properties.
+
+```ts
+const auth = useAuth()
+
+// Base Scheme type — no token or refresh properties
+auth.strategy
+
+// Cast as TokenableScheme — provides the .token property
+auth.tokenStrategy
+auth.tokenStrategy.token?.get()
+
+// Cast as RefreshableScheme — provides .refreshToken and .refreshController
+auth.refreshStrategy
+auth.refreshStrategy.refreshToken.get()
+auth.refreshStrategy.refreshController.handleRefresh()
+```
+
+<Note>
+  All three getters call the same internal `getStrategy()` method and return the same object at runtime. They exist exclusively for TypeScript type narrowing. If your active strategy does not actually implement the `token` or `refreshToken` interface, accessing those properties will return `undefined` — always use optional chaining (`?.`) when in doubt.
+</Note>

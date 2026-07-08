@@ -1,0 +1,153 @@
+---
+title: "TypeScript Support and Type Augmentation"
+sidebarTitle: "TypeScript"
+description: "Extend @nuxt-alt/auth TypeScript types for user data, add custom strategy type safety, and use ModuleOptions and scheme interfaces in your Nuxt 3 project."
+---
+
+`@nuxt-alt/auth` is written entirely in TypeScript and ships complete type definitions. The module augments three external type namespaces automatically: Nuxt's `NuxtApp` (to inject `$auth`), `vue-router`'s `RouteMeta` (to add the `auth` page meta property), and `@nuxt/schema` (to add the `auth` key to `NuxtConfig`). All of these augmentations are active as soon as the package is installed — no extra configuration is required.
+
+## Extending UserInfo
+
+The `auth.user` property is typed as `UserInfo`, a dedicated interface that you can extend via TypeScript declaration merging. This gives you full type safety when reading user properties anywhere in your application.
+
+Create a declaration file (e.g. `types/auth.d.ts`) in your project root and merge your user shape into the interface:
+
+```ts types/auth.d.ts
+declare module '@nuxt-alt/auth' {
+  interface UserInfo {
+    id: number
+    email: string
+    name: string
+    role: 'admin' | 'user'
+  }
+}
+
+export {}
+```
+
+After adding this file, `auth.user?.email` and `auth.user?.role` will be correctly typed throughout your project. TypeScript will also catch typos like `auth.user?.emial` at compile time.
+
+<Note>
+  The `export {}` at the bottom of the file is required to make TypeScript treat the file as a module rather than a global script. Without it, the `declare module` block may not be recognized correctly.
+</Note>
+
+## NuxtApp Augmentation
+
+The module augments `#app`'s `NuxtApp` interface to add `$auth: Auth`. This means `$auth` is available everywhere `useNuxtApp()` is used without any additional type imports:
+
+```ts
+// $auth is automatically typed as Auth — no imports needed
+const { $auth } = useNuxtApp()
+
+// or use the module's composable:
+const auth = useAuth()
+```
+
+Both expressions return the same `Auth` instance with identical type information.
+
+## RouteMeta Augmentation
+
+The module augments `vue-router`'s `RouteMeta` interface to add the `auth` property. This means `definePageMeta` will surface TypeScript errors if you pass an invalid value:
+
+```ts
+// TypeScript knows the valid values for auth: 'guest' | false
+definePageMeta({ auth: 'guest' }) // ✅ valid
+definePageMeta({ auth: false })   // ✅ valid
+definePageMeta({ auth: true })    // ✅ valid (opts into middleware)
+definePageMeta({ auth: 'admin' }) // ❌ type error
+```
+
+The full augmented type declaration looks like this:
+
+```ts
+declare module 'vue-router' {
+  interface RouteMeta {
+    auth?: 'guest' | false
+  }
+}
+```
+
+## ModuleOptions Type
+
+You can import the `ModuleOptions` type directly from `@nuxt-alt/auth` when you want to build a typed configuration object outside of `nuxt.config.ts`:
+
+```ts
+import type { ModuleOptions } from '@nuxt-alt/auth'
+
+const authConfig: Partial<ModuleOptions> = {
+  globalMiddleware: false,
+  redirectStrategy: 'storage',
+  tokenValidationInterval: 5000,
+  resetOnResponseError: true,
+  redirect: {
+    login: '/login',
+    logout: '/',
+    callback: '/login',
+    home: '/dashboard',
+  },
+}
+```
+
+`ModuleOptions` is also re-exported from the main package entry point, so it is always available without digging into sub-paths.
+
+## Scheme Type Narrowing
+
+The `Auth` class provides three typed strategy getters that all return the same active strategy at runtime but expose different TypeScript types. This lets you safely access token-specific APIs without unsafe casts:
+
+```ts
+const auth = useAuth()
+
+// Generic Scheme — base interface with no token properties
+const scheme: Scheme = auth.strategy
+
+// TokenableScheme — exposes the .token property and .requestHandler
+const tokenScheme: TokenableScheme = auth.tokenStrategy
+console.log(tokenScheme.token?.get())
+
+// RefreshableScheme — exposes .refreshToken and .refreshController
+const refreshScheme: RefreshableScheme = auth.refreshStrategy
+console.log(refreshScheme.refreshToken.get())
+await refreshScheme.refreshController.handleRefresh()
+```
+
+The `SchemeCheck` return type from `auth.check()` is also fully typed:
+
+```ts
+const result: SchemeCheck = auth.check(true)
+// result.valid, result.tokenExpired, result.refreshTokenExpired,
+// result.idTokenExpired, result.isRefreshable are all typed as boolean | undefined
+```
+
+<Tip>
+  You can import any of the scheme interfaces directly from `@nuxt-alt/auth` when building custom schemes or strategy plugins:
+
+  ```ts
+  import type {
+    Scheme,
+    SchemeOptions,
+    SchemeCheck,
+    TokenableScheme,
+    TokenableSchemeOptions,
+    RefreshableScheme,
+    RefreshableSchemeOptions,
+  } from '@nuxt-alt/auth'
+  ```
+
+  These types are re-exported from the main package entry point so you never need to reach into internal sub-paths.
+</Tip>
+
+## Module Aliases
+
+The module registers three path aliases that you can use when building custom schemes or providers. TypeScript will resolve these correctly through Nuxt's tsconfig path mapping:
+
+<CardGroup cols={3}>
+  <Card title="#auth/runtime" icon="code">
+    Access the core `Auth` class, `Storage`, token helpers, and middleware directly.
+  </Card>
+  <Card title="#auth/providers" icon="puzzle-piece">
+    Import built-in provider configurations such as `github`, `google`, and `laravelSanctum`.
+  </Card>
+  <Card title="#auth/utils" icon="wrench">
+    Access shared utilities like `routeMeta`, `normalizePath`, `isSet`, and `getProp`.
+  </Card>
+</CardGroup>

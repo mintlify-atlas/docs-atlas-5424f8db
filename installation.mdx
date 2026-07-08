@@ -1,0 +1,95 @@
+---
+title: "Install @nuxt-alt/auth in Your Nuxt 3 Project"
+sidebarTitle: "Installation"
+description: "Add @nuxt-alt/auth and @nuxt-alt/http to your Nuxt 3 project and register the module in nuxt.config.ts to enable authentication."
+---
+
+Installing `@nuxt-alt/auth` requires two packages: the auth module itself and `@nuxt-alt/http`, the HTTP client it depends on. `@nuxt-alt/http` extends `ofetch` (Nuxt 3's built-in fetch layer) with interceptors and a plugin-friendly API that the auth module uses to attach tokens, handle 401 responses, and fire request hooks. While `@nuxt-alt/http` is auto-installed by the auth module at build time, adding it explicitly to your dependencies is recommended so that its version is pinned in your lockfile and you can configure it independently if needed.
+
+## Install Packages
+
+<CodeGroup>
+```bash npm
+npm install @nuxt-alt/auth @nuxt-alt/http
+```
+
+```bash yarn
+yarn add @nuxt-alt/auth @nuxt-alt/http
+```
+
+```bash pnpm
+pnpm add @nuxt-alt/auth @nuxt-alt/http
+```
+</CodeGroup>
+
+## Register the Module
+
+Add `@nuxt-alt/auth` to the `modules` array in your `nuxt.config.ts` and provide your configuration under the `auth` key.
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['@nuxt-alt/auth'],
+  auth: {
+    /* module options */
+  },
+})
+```
+
+<Note>
+  You do **not** need to add `@nuxt-alt/http` to your `modules` array — the
+  auth module detects its absence and installs it automatically. If you do add
+  it manually (for example to configure proxy or interceptor options), place it
+  **below** `@nuxt-alt/auth` in the `modules` array so that the auth module
+  initialises first.
+</Note>
+
+## Optional: Pinia Store
+
+By default, `@nuxt-alt/auth` stores reactive auth state using Nuxt's built-in `useState`. If you prefer Pinia as the store backend — for example, to use Pinia's devtools or to share auth state with other Pinia stores — add `@pinia/nuxt` to your modules and enable the Pinia store option:
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  modules: [
+    '@nuxt-alt/auth',
+    '@pinia/nuxt',
+  ],
+  auth: {
+    stores: {
+      pinia: { enabled: true },
+    },
+  },
+})
+```
+
+When `stores.pinia.enabled` is `true`, the module registers its state inside a Pinia store namespaced to `auth` (configurable via `stores.pinia.namespace`). When it is `false` (the default), `useState` is used instead — no additional dependencies are required.
+
+## Module Aliases
+
+At build time, `@nuxt-alt/auth` registers three path aliases that you can import in your own code:
+
+| Alias | Contents |
+|---|---|
+| `#auth/runtime` | Scheme base classes and token utility classes used to build custom schemes. |
+| `#auth/providers` | Built-in provider factory functions (e.g. `github()`, `google()`, `discord()`). |
+| `#auth/utils` | Shared utility functions used internally by the module (URL helpers, token parsers, etc.). |
+
+These aliases are transpiled automatically — you can import from them in both client and server (Nitro) contexts without additional configuration.
+
+## TypeScript: Augmenting User Info
+
+If you are using TypeScript, you can extend the `UserInfo` interface to type `auth.user` throughout your application:
+
+```ts auth.d.ts
+declare module '@nuxt-alt/auth' {
+  interface UserInfo {
+    email: string
+    name: string
+  }
+}
+```
+
+<Tip>
+  With the module installed and registered, head to the [Quickstart](/quickstart)
+  guide to configure your first authentication strategy and build a working
+  login flow.
+</Tip>

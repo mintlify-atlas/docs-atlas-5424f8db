@@ -1,0 +1,260 @@
+---
+title: "OAuth2 Scheme: Authorization Code and Implicit Flows"
+sidebarTitle: "OAuth2"
+description: "Configure the OAuth2 scheme in @nuxt-alt/auth for authorization code, implicit, and client credentials flows with PKCE, popup windows, and refresh token support."
+---
+
+The `oauth2` scheme implements the full OAuth2 authorization flow, supporting the authorization code grant with PKCE (`S256` or `plain`), the implicit token flow, and refresh token rotation. It handles the complete redirect-and-callback lifecycle, exchanges authorization codes for access tokens, stores and renews tokens automatically, and fetches the user profile from a configurable userinfo endpoint. Use it to integrate with any standards-compliant OAuth2 provider such as GitHub, Google, Auth0, or Okta.
+
+## Configuration
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      github: {
+        scheme: 'oauth2',
+        clientId: 'YOUR_CLIENT_ID',
+        scope: ['read:user'],
+        endpoints: {
+          authorization: 'https://github.com/login/oauth/authorize',
+          token:         'https://github.com/login/oauth/access_token',
+          userInfo:      'https://api.github.com/user',
+          logout:        false,
+        },
+        responseType:        'code',
+        grantType:           'authorization_code',
+        codeChallengeMethod: 'S256',
+        redirectUri:         'https://yourapp.com/login',
+      },
+    },
+  },
+})
+```
+
+---
+
+## Endpoints
+
+<ParamField body="endpoints.authorization" type="string" required>
+  The OAuth2 authorization URL. The user is redirected here to grant access. This is the only required endpoint.
+</ParamField>
+
+<ParamField body="endpoints.token" type="string">
+  The token exchange endpoint. Required when using the `authorization_code` grant type. The scheme makes a `POST` request here to exchange an authorization code for an access token.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="endpoints.userInfo" type="string">
+  The userinfo endpoint URL. The scheme makes an authenticated `GET` request here to populate the user object after a successful token exchange. When not set, the user object is left empty.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="endpoints.logout" type="string | false">
+  The logout redirect URL. When set, the user is redirected here (with `client_id` and `redirect_uri` query parameters appended) on logout. Set to `false` or leave unset to perform only a local session reset without a provider redirect.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## OAuth2 Flow
+
+<ParamField body="responseType" type="string">
+  The OAuth2 `response_type` parameter sent in the authorization request. Common values are `'code'` (authorization code grant), `'token'` (implicit grant), `'id_token'`, or `'none'`.
+
+  **Default:** `'token'`
+</ParamField>
+
+<ParamField body="grantType" type="string">
+  The OAuth2 `grant_type` sent during the token exchange request. Typical values are `'authorization_code'`, `'client_credentials'`, `'password'`, or `'refresh_token'`.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="responseMode" type="string">
+  The JARM (JWT Secured Authorization Response Mode) mode. Accepted values are `'query.jwt'`, `'fragment.jwt'`, `'form_post.jwt'`, and `'jwt'`. Leave unset for standard responses.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="codeChallengeMethod" type="'S256' | 'plain' | 'implicit' | false">
+  The PKCE code challenge method. Use `'S256'` for SHA-256 hashed challenges (recommended), `'plain'` for unencoded challenges, or `false` to disable PKCE entirely.
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="scope" type="string | string[]">
+  The OAuth2 scopes to request. May be provided as a space-delimited string or an array of scope names. Arrays are joined with a space before being sent to the provider.
+
+  **Default:** `[]`
+</ParamField>
+
+<ParamField body="state" type="string">
+  A custom state string included in the authorization request. When not set, a random 10-character string is generated automatically for CSRF protection.
+
+  **Default:** auto-generated
+</ParamField>
+
+<ParamField body="acrValues" type="string">
+  Authentication Context Class Reference values forwarded as `acr_values` in the authorization request. Used by some enterprise identity providers to request specific authentication assurance levels.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="audience" type="string">
+  The intended `audience` of the access token. Required by some providers (e.g. Auth0) to scope the token to a specific API.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## Client
+
+<ParamField body="clientId" type="string" required>
+  Your OAuth2 application's client ID, issued by the provider when you register the application.
+</ParamField>
+
+<ParamField body="clientSecretTransport" type="'body' | 'authorization_header'">
+  Controls how the client secret is sent during the token exchange. `'body'` includes it as a form field; `'authorization_header'` uses HTTP Basic authentication.
+
+  **Default:** `'body'`
+</ParamField>
+
+<ParamField body="redirectUri" type="string">
+  The callback URI registered with the OAuth2 provider. When not set, the scheme auto-computes it from the app's `baseURL` and the `redirect.callback` path configured in `auth.options.redirect`.
+
+  **Default:** auto-computed
+</ParamField>
+
+<ParamField body="logoutRedirectUri" type="string">
+  The URI the provider should redirect the user to after logout. When not set, the scheme auto-computes it from the app's origin and the `redirect.logout` path.
+
+  **Default:** auto-computed
+</ParamField>
+
+<ParamField body="accessType" type="'online' | 'offline'">
+  Google's `access_type` parameter. Use `'offline'` to request a refresh token from Google's OAuth2 server.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## Popup Window
+
+By default the OAuth2 scheme redirects the entire page to the provider. Setting `clientWindow: true` opens the provider's authorization page in a popup instead, leaving the parent page in place. After the user approves access, the popup posts a message back to the parent and closes automatically.
+
+<ParamField body="clientWindow" type="boolean">
+  When `true`, opens the OAuth2 authorization flow in a popup window instead of redirecting the current page.
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="clientWindowWidth" type="number">
+  Width of the popup window in pixels.
+
+  **Default:** `400`
+</ParamField>
+
+<ParamField body="clientWindowHeight" type="number">
+  Height of the popup window in pixels.
+
+  **Default:** `600`
+</ParamField>
+
+### Popup configuration example
+
+```ts
+strategies: {
+  google: {
+    scheme: 'oauth2',
+    clientId: 'YOUR_CLIENT_ID',
+    clientWindow: true,       // opens a popup instead of redirecting
+    clientWindowWidth: 500,
+    clientWindowHeight: 700,
+    scope: ['profile', 'email'],
+    endpoints: {
+      authorization: 'https://accounts.google.com/o/oauth2/auth',
+      token:         'https://oauth2.googleapis.com/token',
+      userInfo:      'https://www.googleapis.com/oauth2/v3/userinfo',
+    },
+    responseType: 'code',
+    grantType:    'authorization_code',
+  },
+}
+```
+
+<Tip>
+  Safari blocks popup windows that are opened after an `await` call. The scheme opens the window synchronously on the first `loginWith` call to satisfy Safari's user gesture requirement.
+</Tip>
+
+---
+
+## Refresh Token
+
+<ParamField body="refreshToken.property" type="string | false">
+  The dot-notation path in the token exchange (or refresh) response where the refresh token lives. Set to `false` if the provider does not return a refresh token.
+
+  **Default:** `'refresh_token'`
+</ParamField>
+
+<ParamField body="refreshToken.maxAge" type="number | false">
+  The refresh token's lifetime in seconds. Used to determine when the refresh token itself has expired and a new authorization flow is required.
+
+  **Default:** `2592000` (30 days)
+</ParamField>
+
+<ParamField body="refreshToken.httpOnly" type="boolean">
+  When `true`, the refresh token is expected to be stored in a server-managed `httpOnly` cookie. The scheme omits the refresh token from request bodies, relying on the browser to send the cookie automatically.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
+## Other Options
+
+<ParamField body="autoLogout" type="boolean">
+  When `true`, the scheme resets the session on mount if the access token has expired and cannot be refreshed (e.g. the refresh token has also expired or is unavailable).
+
+  **Default:** `false`
+</ParamField>
+
+<ParamField body="organization" type="string">
+  An organization identifier forwarded as the `organization` parameter in the authorization request. Used by Auth0 and some Okta configurations.
+
+  **Default:** `undefined`
+</ParamField>
+
+---
+
+## Triggering Login Programmatically
+
+Calling `loginWith` on an OAuth2 strategy initiates the provider redirect (or popup). No credentials are needed — the provider handles authentication:
+
+```ts
+const auth = useAuth()
+
+// Redirects the page to the OAuth provider's authorization URL
+await auth.loginWith('github')
+```
+
+To pass additional authorization parameters:
+
+```ts
+await auth.loginWith('github', {
+  params: {
+    prompt: 'consent',
+  },
+})
+```
+
+---
+
+<Note>
+  The OAuth2 callback route (default: `/login`) must be publicly accessible without authentication. Mark the page with `definePageMeta({ auth: false })` to prevent the auth middleware from redirecting unauthenticated users away before the callback can be processed.
+</Note>

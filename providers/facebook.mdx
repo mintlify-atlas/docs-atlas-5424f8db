@@ -1,0 +1,63 @@
+---
+title: "Facebook OAuth Provider for @nuxt-alt/auth"
+sidebarTitle: "Facebook"
+description: "Configure Facebook Login in @nuxt-alt/auth using the facebook provider with OAuth2 authorization code flow and Facebook Graph API user info."
+---
+
+The Facebook provider configures `@nuxt-alt/auth` to authenticate users through Facebook Login. It uses the `oauth2` scheme and targets Facebook's v2.12 Graph API for both the authorization dialog and user profile retrieval. The userinfo endpoint is pre-configured to request the `about`, `name`, `picture`, and `email` fields from the Graph API, so you get a rich user object immediately after login without any extra API calls.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `clientId` | `string` | The App ID from your Facebook App dashboard |
+| `clientSecret` | `string` | The App Secret from your Facebook App dashboard |
+
+## Configuration
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      facebook: {
+        clientId: 'YOUR_APP_ID',
+        clientSecret: 'YOUR_APP_SECRET',
+        // Optional: override the default scopes
+        scope: ['public_profile', 'email'],
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+When the strategy name is `facebook`, the provider automatically sets the following values. Any property you specify in your own config takes precedence.
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'oauth2'` |
+| `endpoints.authorization` | `https://facebook.com/v2.12/dialog/oauth` |
+| `endpoints.userInfo` | `https://graph.facebook.com/v2.12/me?fields=about,name,picture{url},email` |
+| `scope` | `['public_profile', 'email']` |
+| `token.property` | `'access_token'` |
+| `token.type` | `'Bearer'` |
+| `token.name` | `'Authorization'` |
+| `refreshToken.property` | `'refresh_token'` |
+| `responseType` | `'token'` |
+| `clientSecretTransport` | `'body'` |
+
+## Logging In
+
+Trigger the Facebook Login redirect from any component or composable:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('facebook')
+```
+
+The user is presented with Facebook's login dialog and permission request. After granting access, Facebook redirects back to your application's callback route where `@nuxt-alt/auth` processes the token and fetches the user profile from the Graph API.
+
+<Note>
+  In your Facebook App dashboard, navigate to **Facebook Login → Settings** and add your application's callback URL to the **Valid OAuth Redirect URIs** list. The default callback route used by `@nuxt-alt/auth` is `/login`. Your app must also be in **Live** mode (or the authenticating user must be a test user) for the login flow to work in production.
+</Note>

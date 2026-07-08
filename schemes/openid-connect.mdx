@@ -1,0 +1,140 @@
+---
+title: "OpenID Connect Scheme for Nuxt 3 Authentication"
+sidebarTitle: "OpenID Connect"
+description: "Configure the OpenID Connect scheme in @nuxt-alt/auth with OIDC discovery, ID token handling, PKCE, and automatic endpoint resolution from the configuration document."
+---
+
+The `openIDConnect` scheme extends `Oauth2Scheme` with full OpenID Connect support. It fetches the provider's OIDC discovery document on module mount, automatically resolving the authorization, token, userInfo, and logout endpoint URLs from it. It adds first-class handling for the `id_token` returned by OIDC providers, uses `S256` PKCE by default, and — when `fetchRemote` is `false` — derives the user object directly from the ID token's JWT claims without an extra network request. This makes it suitable for any OIDC-compliant provider: Keycloak, Auth0, Azure AD, Okta, Google, and others.
+
+## Configuration
+
+```ts nuxt.config.ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      keycloak: {
+        scheme: 'openIDConnect',
+        clientId: 'YOUR_CLIENT_ID',
+        issuer: 'https://keycloak.example.com/realms/myrealm',
+        endpoints: {
+          configuration: 'https://keycloak.example.com/realms/myrealm/.well-known/openid-configuration',
+        },
+        scope: ['openid', 'profile', 'email'],
+        responseType:        'code',
+        grantType:           'authorization_code',
+        codeChallengeMethod: 'S256',
+        fetchRemote:         false,
+      },
+    },
+  },
+})
+```
+
+---
+
+## OpenID Connect–Specific Options
+
+<ParamField body="endpoints.configuration" type="string">
+  The URL of the provider's OIDC discovery document (typically a path ending in `/.well-known/openid-configuration`). On mount, the scheme fetches this document and uses the endpoint URLs it contains — `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`, and `end_session_endpoint` — to populate `endpoints.authorization`, `endpoints.token`, `endpoints.userInfo`, and `endpoints.logout` respectively. Manually configured endpoint values are overridden by those found in the document.
+
+  **Default:** `undefined`
+</ParamField>
+
+<ParamField body="fetchRemote" type="boolean">
+  Controls where user info comes from after a successful token exchange. When `false`, the scheme decodes the ID token locally and uses its JWT claims as the user object — no extra HTTP request is made. When `true`, the scheme sends an authenticated request to the `userInfo` endpoint to retrieve the user profile.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
+## ID Token Options
+
+<ParamField body="idToken.property" type="string">
+  The dot-notation path in the token exchange response where the ID token lives.
+
+  **Default:** `'id_token'`
+</ParamField>
+
+<ParamField body="idToken.maxAge" type="number">
+  The ID token's lifetime in seconds. The scheme uses this value to track expiry in storage alongside the access token.
+
+  **Default:** `1800` (30 minutes)
+</ParamField>
+
+<ParamField body="idToken.prefix" type="string">
+  The key prefix used when persisting the ID token in storage.
+
+  **Default:** `'_id_token.'`
+</ParamField>
+
+<ParamField body="idToken.expirationPrefix" type="string">
+  The key prefix used when persisting the ID token expiration timestamp in storage.
+
+  **Default:** `'_id_token_expiration.'`
+</ParamField>
+
+<ParamField body="idToken.httpOnly" type="boolean">
+  When `true`, the ID token is expected to be managed by an `httpOnly` cookie on the server side rather than stored in JavaScript-accessible storage.
+
+  **Default:** `false`
+</ParamField>
+
+---
+
+## Scheme Defaults
+
+The `openIDConnect` scheme sets the following option defaults automatically. You can override any of them in your strategy configuration, but they represent best-practice values for OIDC:
+
+| Option                | Default                                     |
+|-----------------------|---------------------------------------------|
+| `responseType`        | `'code'`                                    |
+| `grantType`           | `'authorization_code'`                      |
+| `scope`               | `['openid', 'profile', 'offline_access']`   |
+| `codeChallengeMethod` | `'S256'`                                    |
+
+---
+
+## Inherited Options
+
+All options from the [OAuth2 scheme](/schemes/oauth2) apply here, including `clientId`, `redirectUri`, `logoutRedirectUri`, `scope`, `responseType`, `grantType`, `codeChallengeMethod`, `clientWindow`, `refreshToken`, `autoLogout`, `audience`, `acrValues`, `organization`, and `accessType`.
+
+---
+
+## ID Token Claims as User Object
+
+When `fetchRemote` is `false` (the default), the scheme decodes the ID token locally after a successful authorization code exchange and sets the decoded claims as the user object. This avoids an extra round-trip to the userInfo endpoint:
+
+```ts
+// Access ID token claims via the user object (when fetchRemote: false)
+const auth = useAuth()
+
+// Decoded claims from the ID token — e.g. sub, email, name, picture
+console.log(auth.user)
+// { sub: '...', email: 'user@example.com', name: 'Alice', ... }
+```
+
+Switch to `fetchRemote: true` if your provider returns additional claims on the userInfo endpoint that are not present in the ID token:
+
+```ts
+fetchRemote: true, // makes a GET request to endpoints.userInfo after token exchange
+```
+
+---
+
+## Logout
+
+The `openIDConnect` scheme appends `id_token_hint` (the raw ID token) and `post_logout_redirect_uri` to the logout URL, as required by the OIDC session management specification. This ensures the provider correctly terminates the provider-side session:
+
+```ts
+// Calling auth.logout() redirects to:
+// https://provider.example.com/logout
+//   ?id_token_hint=<id_token>
+//   &post_logout_redirect_uri=https://yourapp.com/
+```
+
+---
+
+<Note>
+  The OIDC configuration document is fetched on every module mount. Endpoint URLs discovered inside the document take precedence over any values you configure manually under `endpoints`. If your provider's discovery URL is stable, consider caching the document to avoid the extra network request on every page load.
+</Note>

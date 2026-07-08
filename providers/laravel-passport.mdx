@@ -1,0 +1,120 @@
+---
+title: "Laravel Passport Provider for @nuxt-alt/auth"
+sidebarTitle: "Laravel Passport"
+description: "Configure @nuxt-alt/auth with Laravel Passport for OAuth2 authentication using password grant, authorization code flow, or client credentials."
+---
+
+The Laravel Passport provider configures `@nuxt-alt/auth` to authenticate users against a Laravel backend running Laravel Passport. It supports two distinct flows selected by the `grantType` you specify in your strategy config: the **authorization code** flow (the default, using the `oauth2` scheme with a server-side authorize route) and the **password grant** flow (using the `refresh` scheme for direct credential exchange with refresh token rotation). All endpoint URLs are derived from the `url` you provide.
+
+## Required Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `url` | `string` | The base URL of your Laravel application, e.g. `http://localhost:8000` |
+| `clientId` | `string` | The Passport OAuth client ID |
+| `clientSecret` | `string` | The Passport OAuth client secret |
+
+## Configuration
+
+### Authorization Code Flow (default)
+
+The authorization code flow redirects the user to the Passport authorization page and exchanges the code server-side. This is the recommended flow for SPA authentication.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelPassport: {
+        url: 'http://localhost:8000',
+        clientId: 'YOUR_CLIENT_ID',
+        clientSecret: 'YOUR_CLIENT_SECRET',
+        // grantType defaults to 'authorization_code'
+      },
+    },
+  },
+})
+```
+
+### Password Grant Flow
+
+The password grant flow exchanges a username and password directly for tokens without a redirect. Use this for first-party clients where you control the login form.
+
+```ts
+export default defineNuxtConfig({
+  auth: {
+    strategies: {
+      laravelPassport: {
+        url: 'http://localhost:8000',
+        clientId: 'YOUR_CLIENT_ID',
+        clientSecret: 'YOUR_CLIENT_SECRET',
+        grantType: 'password',
+      },
+    },
+  },
+})
+```
+
+## Auto-Configured Defaults
+
+### Authorization Code Flow
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'oauth2'` |
+| `endpoints.authorization` | `{url}/oauth/authorize` |
+| `endpoints.token` | `{url}/oauth/token` |
+| `endpoints.userInfo` | `{url}/api/auth/user` |
+| `endpoints.logout` | `false` (disabled) |
+| `responseType` | `'code'` |
+| `grantType` | `'authorization_code'` |
+| `scope` | `'*'` |
+| `token.property` | `'access_token'` |
+| `token.type` | `'Bearer'` |
+| `token.name` | `'Authorization'` |
+| `token.maxAge` | `31536000` (1 year, in seconds) |
+| `refreshToken.property` | `'refresh_token'` |
+| `refreshToken.maxAge` | `2592000` (30 days, in seconds) |
+| `user.property` | `false` |
+
+### Password Grant Flow
+
+| Property | Auto-Configured Value |
+|----------|-----------------------|
+| `scheme` | `'refresh'` |
+| `endpoints.token` | `{url}/oauth/token` |
+| `endpoints.login.baseURL` | `''` |
+| `endpoints.refresh.baseURL` | `''` |
+| `endpoints.logout` | `false` (disabled) |
+| `endpoints.user.url` | `{url}/api/auth/user` |
+| `grantType` | `'password'` |
+| `token.property` | `'access_token'` |
+| `token.type` | `'Bearer'` |
+| `token.maxAge` | `31536000` (1 year, in seconds) |
+| `refreshToken.property` | `'refresh_token'` |
+| `refreshToken.maxAge` | `2592000` (30 days, in seconds) |
+| `user.property` | `false` |
+
+## Logging In
+
+**Authorization code flow** — redirects the user to the Passport authorization page:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('laravelPassport')
+```
+
+**Password grant flow** — submits credentials directly:
+
+```ts
+const auth = useAuth()
+await auth.loginWith('laravelPassport', {
+  body: {
+    username: 'user@example.com',
+    password: 'password',
+  },
+})
+```
+
+<Note>
+  When using the password grant flow, you must create a Laravel Passport **Password Grant Client** (`php artisan passport:client --password`) and use the resulting client ID and secret. The password grant is disabled by default in newer versions of Passport — enable it in your `AuthServiceProvider` with `Passport::enablePasswordGrant()`.
+</Note>
